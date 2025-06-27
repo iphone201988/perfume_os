@@ -94,27 +94,33 @@ const updateDataValidation = {
     }),
     gender: Joi.string().optional().messages({
       "string.base": "Gender must be a string",
+      "string.empty": "Gender cannot be empty",
     }),
     language: Joi.string().optional().messages({
       "string.base": "Language must be a string",
     }),
     dob: Joi.date().optional().messages({
       "date.base": "DOB must be a valid date",
+      "string.empty": "DOB cannot be empty",
     }),
     perfumeStrength: Joi.number().optional().messages({
       "number.base": "Perfume strength must be a number",
+      "string.empty": "Perfume strength cannot be empty",
     }),
     perfumeBudget: Joi.string().optional().messages({
       "string.base": "Perfume budget must be a string",
+      "string.empty": "Perfume budget cannot be empty",
     }),
     enjoySmell: Joi.array().items(Joi.string()).optional().messages({
       "array.base": "Enjoy smell must be an array of strings",
     }),
     reasonForWearPerfume: Joi.string().optional().messages({
       "string.base": "Reason for wearing perfume must be a string",
+      "string.empty": "Reason for wearing perfume cannot be empty",
     }),
     referralSource: Joi.string().optional().messages({
       "string.base": "Referral source must be a string",
+      "string.empty": "Referral source cannot be empty",
     }),
     referredBy: Joi.string().optional().allow(null,"").messages({
       "string.base": "Referred by must be a string",
