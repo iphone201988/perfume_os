@@ -20,7 +20,12 @@ userRouter.delete("/deleteAccount",authMiddleware , userController.deleteUser);
 //uplaod image  
 userRouter.post("/upload", authMiddleware,upload.single("file"), userController.uploadImage);
 
+//follow user
+userRouter.post("/follow/:userId", authMiddleware, validate(userValidation.followValidation), userController.followUser);
 
+//collection
+userRouter.post("/collection/:perfumeId", authMiddleware,validate(userValidation.collectionValidation), userController.addCollection);
+userRouter.post("/wishlist/:perfumeId", authMiddleware,validate(userValidation.collectionValidation),  userController.addWishlist);
 
 
 export default userRouter

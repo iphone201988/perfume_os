@@ -5,4 +5,7 @@ import { validate } from "../middleware/validate";
 import { upload } from "../middleware/upload";
 const perfumeRouter = express.Router();
 
+perfumeRouter.get("/", authMiddleware, perfumeController.perfume);
 
+
+export default perfumeRouter

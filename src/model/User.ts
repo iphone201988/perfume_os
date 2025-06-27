@@ -29,6 +29,7 @@ const UserSchema = new mongoose.Schema<IUser>({
     deviceType: { type: String, default: null },
     isBlocked: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false },
+    rankPoints: { type: Number, default: 0 },
 }, { timestamps: true });
 
 

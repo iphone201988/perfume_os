@@ -32,6 +32,7 @@ export interface IUser extends Document {
     isDeleted: boolean;
     deviceToken: string | null;
     deviceType: string | null;
+    rankPoints: number; 
     createdAt: Date;
     updatedAt: Date;
 }

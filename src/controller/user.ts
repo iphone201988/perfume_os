@@ -1,10 +1,16 @@
 import { NextFunction, Request, Response } from "express";
-import { comparePassword, findUserByEmail, findUserByReferral, findUserBySocialId, findUserByUsername, generateOtp, hashPassword, otpExpiry, signToken, userData } from "../utils/utills";
+import { comparePassword, findPerfumeById, findUserByEmail, findUserById, findUserByReferral, findUserBySocialId, findUserByUsername, generateOtp, hashPassword, otpExpiry, signToken, userData } from "../utils/utills";
 import UserModel from "../model/User";
 import PerfumeModel from "../model/Perfume";
 import { SUCCESS } from "../utils/response";
 import { BadRequestError } from "../utils/errors";
 import { sendEmail } from "../services/sendEmail";
+import FollowModel from "../model/Follow";
+import CollectionModel from "../model/Collection";
+import WishlistModel from "../model/Wishlist";
+import ReviewModel from "../model/Reviews";
+import { IUser } from "../types/database/type";
+import BadgesModel from "../model/Badges";
 //social login
 const socialLogin = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
@@ -66,7 +72,7 @@ const register = async (req: Request, res: Response, next: NextFunction): Promis
         await user.save();
         const data = userData(user)
         const token = signToken({ id: user._id, jti: user.jti });
-        SUCCESS(res, 201, "User created successfully",{data:{ ...data, token}});
+        SUCCESS(res, 201, "User created successfully", { data: { ...data, token } });
     } catch (error) {
         console.log("error in register", error);
         next(error);
@@ -99,13 +105,100 @@ const login = async (req: Request, res: Response, next: NextFunction): Promise<a
 //get profile
 const profile = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
-        const user = req.user;
-        const data = userData(user);
+        const { userId, type = "1" } = req.query;
+        let viewedUser: IUser | null = null;
+        let currentUser: IUser | null = null;
+
+        if (type === "1") {
+            currentUser = req.user;
+            viewedUser = req.user;
+        } else {
+            viewedUser = await findUserById(userId as string);
+            if (!viewedUser) throw new BadRequestError("User does not exist");
+            currentUser = req.user;
+        }
+        const data: any = userData(viewedUser);
+
+        const [collections, wishlists, badges, isFollowing, followers, following, reviewDataAgg] = await Promise.all([
+            CollectionModel.find({ userId: viewedUser._id }).populate("perfumeId").lean(),
+            WishlistModel.find({ userId: viewedUser._id }).populate("perfumeId").lean(),
+            BadgesModel.find({ userId: viewedUser._id }).populate("badgeId").lean(),
+            FollowModel.exists({ userId: currentUser._id, following: viewedUser._id }),
+            FollowModel.countDocuments({ followId: viewedUser._id }),
+            FollowModel.countDocuments({ userId: viewedUser._id }),
+            ReviewModel.aggregate([
+                {
+                    $match: { userId: viewedUser._id }
+                },
+                {
+                    $lookup: {
+                        from: "perfumes",
+                        localField: "perfumeId",
+                        foreignField: "_id",
+                        as: "perfume"
+                    }
+                },
+                {
+                    $unwind: {
+                        path: "$perfume",
+                        preserveNullAndEmptyArrays: true
+                    }
+                },
+                {
+                    $facet: {
+                        reviewsList: [
+                            { $sort: { createdAt: -1 } },
+                            {
+                                $project: {
+                                    rating: 1,
+                                    comment: 1,
+                                    perfume: 1,
+                                    createdAt: 1
+                                }
+                            }
+                        ],
+                        stats: [
+                            {
+                                $group: {
+                                    _id: null,
+                                    totalReviews: { $sum: 1 },
+                                    averageRating: { $avg: "$rating" }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    $project: {
+                        reviews: "$reviewsList", // flatten to a top-level "reviews" array
+                        totalReviews: {
+                            $ifNull: [{ $arrayElemAt: ["$stats.totalReviews", 0] }, 0]
+                        },
+                        averageRating: {
+                            $ifNull: [{ $arrayElemAt: ["$stats.averageRating", 0] }, 0]
+                        }
+                    }
+                }
+            ])
+        ]);
+        const { reviews = [], totalReviews = 0, averageRating = 0 } = reviewDataAgg[0] || {}
+        Object.assign(data, {
+            collections,
+            wishlists,
+            badges,
+            isFollowing: !!isFollowing,
+            followers,
+            following,
+            reviews,
+            totalReviews,
+            averageRating
+        });
+
         SUCCESS(res, 200, "Profile fetched successfully", { data });
     } catch (error) {
         next(error);
     }
-}
+};
 export const updateUserData = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
         const user = req.user;
@@ -140,6 +233,12 @@ export const profileUpdate = async (req: Request, res: Response, next: NextFunct
         if (req.file) {
             const fileUrl = `/uploads/${(req.file as Express.Multer.File).filename}`;
             req.body.profileImage = fileUrl;
+        }
+        if (req.body.username) {
+            const checkUsername = await findUserByUsername(req?.body?.username);
+            if (checkUsername) {
+                throw new BadRequestError("Username already exists");
+            }
         }
         Object.assign(user, req.body);
         await user.save();
@@ -244,8 +343,75 @@ const deleteUser = async (req: Request, res: Response, next: NextFunction): Prom
         console.log("error in deleteUser", error);
         next(error);
     }
+};
+
+const followUser = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const user = req.user;
+        const { userId } = req.params;
+        const followingUser = await findUserById(userId);
+        if (!followingUser) {
+            throw new BadRequestError("User does not exist");
+        }
+        const isFollowing = await FollowModel.findOne({ user: user._id, following: followingUser._id });
+        if (isFollowing) {
+            await FollowModel.findByIdAndDelete(isFollowing._id);
+        } else {
+            await FollowModel.create({ user: user._id, following: followingUser._id });
+        }
+        SUCCESS(res, 200, isFollowing ? "User unfollowed successfully" : "User followed successfully");
+    } catch (error) {
+        console.log("error in followUser", error);
+        next(error);
+    }
+}
+
+//add collection
+const addCollection = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+
+    try {
+        const user = req.user;
+        const { perfumeId } = req.params;
+        const perfume = await findPerfumeById(perfumeId);
+        if (!perfume) {
+            throw new BadRequestError("Perfume does not exist");
+        }
+        const isCollection = await CollectionModel.findOne({ userId: user._id, perfumeId: perfume._id });
+        if (isCollection) {
+            await CollectionModel.findByIdAndDelete(isCollection._id);
+        } else {
+            await CollectionModel.create({ userId: user._id, perfumeId: perfume._id });
+        }
+        SUCCESS(res, 200, isCollection ? "Perfume removed from collection successfully" : "Perfume added to collection successfully");
+    } catch (error) {
+        console.log("error in addCollection", error);
+        next(error);
+    }
+};
+//add wishlist 
+const addWishlist = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+
+    try {
+        const user = req.user;
+        const { perfumeId } = req.params;
+        const perfume = await findPerfumeById(perfumeId);
+        if (!perfume) {
+            throw new BadRequestError("Perfume does not exist");
+        }
+        const isWishlist = await WishlistModel.findOne({ userId: user._id, perfumeId: perfume._id });
+        if (isWishlist) {
+            await WishlistModel.findByIdAndDelete(isWishlist._id);
+        } else {
+            await WishlistModel.create({ userId: user._id, perfumeId: perfume._id });
+        }
+        SUCCESS(res, 200, isWishlist ? "Perfume removed from wishlist successfully" : "Perfume added to wishlist successfully");
+    } catch (error) {
+        console.log("error in addWishlist", error);
+        next(error);
+    }
 }
 export default {
     register, login, profile, updateUserData, uploadImage,
-    forgetPassword, verifyOtp, resetPassword, profileUpdate, socialLogin, deleteUser
+    forgetPassword, verifyOtp, resetPassword, profileUpdate, socialLogin, deleteUser,
+    followUser, addCollection, addWishlist
 };
