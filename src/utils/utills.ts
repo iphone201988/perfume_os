@@ -54,3 +54,6 @@ export const downloadImage = async (url: string): Promise<string> => {
 
 export const generateOtp = (number: number = 4, upperCaseAlphabets: boolean = false, specialChars: boolean = false) => otpGenerator.generate(number, { upperCaseAlphabets: upperCaseAlphabets, specialChars: specialChars, lowerCaseAlphabets: upperCaseAlphabets });
 export const otpExpiry = (time: number = 10) => new Date(Date.now() + time * 60 * 1000);
+
+export const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+

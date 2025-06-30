@@ -13,10 +13,10 @@ const PerfumeSchema = new mongoose.Schema({
     quotes: String,
     mainAccords: [{ name: String, width: String, backgroundColor: String }],
     notes: {
-        top: [{ name: String, image: String }],
-        middle: [{ name: String, image: String }],
-        base: [{ name: String, image: String }],
-        notes: [{ name: String, image: String }],
+        top: [{ noteId: { type: mongoose.Schema.Types.ObjectId, ref: "Notes" }, name: String, image: String }],
+        middle: [{ noteId: { type: mongoose.Schema.Types.ObjectId, ref: "Notes" }, name: String, image: String }],
+        base: [{ noteId: { type: mongoose.Schema.Types.ObjectId, ref: "Notes" }, name: String, image: String }],
+        notes: [{ noteId: { type: mongoose.Schema.Types.ObjectId, ref: "Notes" }, name: String, image: String }],
     },
     rating: {
         score: Number,

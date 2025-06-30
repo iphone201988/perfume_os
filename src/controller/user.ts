@@ -337,6 +337,14 @@ const resetPassword = async (req: Request, res: Response, next: NextFunction): P
 const deleteUser = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
         const user = req.user;
+        const password = req.query.password as any;
+        if (!password) {
+            throw new BadRequestError("Password is required");
+        }
+        const isMatch = await comparePassword(password, user.password);
+        if (!isMatch) {
+            throw new BadRequestError("Invalid password");
+        }
         await UserModel.findByIdAndDelete(user._id);
         SUCCESS(res, 200, "User deleted successfully");
     } catch (error) {
