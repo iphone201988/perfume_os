@@ -30,6 +30,8 @@ const UserSchema = new mongoose.Schema<IUser>({
     isBlocked: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false },
     rankPoints: { type: Number, default: 0 },
+    tutorialProgess: { type: Number, default: 0 },
+    theme: { type: String, default: "light" },
 }, { timestamps: true });
 
 

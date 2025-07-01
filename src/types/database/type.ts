@@ -33,6 +33,8 @@ export interface IUser extends Document {
     deviceToken: string | null;
     deviceType: string | null;
     rankPoints: number; 
+    tutorialProgess: number;
+    theme: "light" | "dark";
     createdAt: Date;
     updatedAt: Date;
 }

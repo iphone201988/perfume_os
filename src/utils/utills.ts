@@ -28,7 +28,7 @@ export const findUserByEmail = async (email: string) => await UserModel.findOne(
 export const findUserByUsername = async (username: string) => await UserModel.findOne({ username });
 export const findUserById = async (id: string) => await UserModel.findById(id);
 export const findPerfumeById = async (id: string) => await PerfumeModel.findById(id);
-export const userData = (user: IUser) => {
+export const publicViewData = (user: IUser) => {
   return {
     _id: user._id, username: user.username, fullname: user.fullname, email: user.email, profileImage: user.profileImage, timezone: user.timezone, gender: user.gender, language: user.language, step: user.step, isNotificationOn: user.isNotificationOn, dob: user.dob, socialLinkedAccounts: user.socialLinkedAccounts, isVerified: user.isVerified, isBlocked: user.isBlocked, isDeleted: user.isDeleted,
     perfumeStrength: user.perfumeStrength,

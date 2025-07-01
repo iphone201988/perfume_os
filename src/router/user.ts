@@ -27,5 +27,8 @@ userRouter.post("/follow/:userId", authMiddleware, validate(userValidation.follo
 userRouter.post("/collection/:perfumeId", authMiddleware,validate(userValidation.collectionValidation), userController.addCollection);
 userRouter.post("/wishlist/:perfumeId", authMiddleware,validate(userValidation.collectionValidation),  userController.addWishlist);
 
+//user data
+userRouter.get("/userData", authMiddleware, validate(userValidation.userDataValidation), userController.userData);
+
 
 export default userRouter

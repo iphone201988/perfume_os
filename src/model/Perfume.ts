@@ -8,10 +8,11 @@ const PerfumeSchema = new mongoose.Schema({
     description: { type: String, default: null },
     year: { type: Number, default: null },
     intendedFor: [String],
-    sessions: [{ name: String, width: String }],
+    seasons: [{ name: String, width: String }],
     occasions: [{ name: String, width: String }],
     quotes: String,
     mainAccords: [{ name: String, width: String, backgroundColor: String }],
+    perfumers: [{ perfumerId: { type: mongoose.Schema.Types.ObjectId, ref: "Perfumers" }, name: String, image: String, }],
     notes: {
         top: [{ noteId: { type: mongoose.Schema.Types.ObjectId, ref: "Notes" }, name: String, image: String }],
         middle: [{ noteId: { type: mongoose.Schema.Types.ObjectId, ref: "Notes" }, name: String, image: String }],

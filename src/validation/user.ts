@@ -81,6 +81,14 @@ const updateDataValidation = {
     step: Joi.number().optional().messages({
       "number.base": "Step must be a number",
     }),
+    theme: Joi.string().valid("light", "dark").optional().messages({
+      "string.base": "Theme must be a string",
+      "any.only": "Invalid theme",
+
+    }),
+    tutorialProgess: Joi.number().optional().messages({
+      "number.base": "Tutorial progress must be a number",
+    }),
     oldPassword: Joi.string().min(6).optional().messages({
       "string.base": "Old password must be a string",
       "string.min": "Password must be at least 6 characters long",
@@ -204,6 +212,24 @@ const collectionValidation = {
   }),
 };
 
+const userDataValidation = {
+  query: Joi.object({
+    page: Joi.string().pattern(/^[0-9]+$/).optional().messages({
+      "string.base": "Page must be a string",
+      "string.pattern.base": "Page must be a number",
+    }),
+    limit: Joi.string().pattern(/^[0-9]+$/).optional().messages({
+      "string.base": "Limit must be a string",
+      "string.pattern.base": "Limit must be a number",
+    }),
+    type: Joi.string().valid("collection", "review", "badge", "wishlist").required().messages({
+      "string.base": "Type must be a string",
+      "any.required": "Type is required",
+      "any.only": "Invalid type",
+    })
+  }),
+};
+
 export default {
   socialLoginValidation,
   registerValidation,
@@ -215,4 +241,5 @@ export default {
   resetValidation,
   followValidation,
   collectionValidation,
+  userDataValidation
 };

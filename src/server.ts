@@ -10,11 +10,11 @@ const io = new Server(server, {
 
 
 initSocketIO(io);
-setSocketServerInstance(io);   
+setSocketServerInstance(io);
 
-connectDataBase();
 const port = process.env.PORT || 3000
 
 server.listen(port, () => {
-    console.log(`🚀 Server running on port ${port}`);
+  connectDataBase();
+  console.log(`Server running on port ${port}`);
 });
