@@ -140,21 +140,21 @@ const profile = async (req: Request, res: Response, next: NextFunction): Promise
                         from: "Perfume",
                         localField: "perfumeId",
                         foreignField: "_id",
-                        as: "perfume",
+                        as: "perfumeId",
                         pipeline: [{ $project: { name: 1, brand: 1, image: 1 } }]
                     }
                 },
-                { $unwind: { path: "$perfume", preserveNullAndEmptyArrays: true } },
+                { $unwind: { path: "$perfumeId", preserveNullAndEmptyArrays: true } },
                 {
                     $lookup: {
                         from: "User",
                         localField: "userId",
                         foreignField: "_id",
-                        as: "perfume",
+                        as: "userId",
                         pipeline: [{ $project: { fullname: 1, profileImage: 1 } }]
                     }
                 },
-                { $unwind: { path: "$perfume", preserveNullAndEmptyArrays: true } },
+                { $unwind: { path: "$userId", preserveNullAndEmptyArrays: true } },
                 {
                     $facet: {
                         reviewsList: [
@@ -164,7 +164,8 @@ const profile = async (req: Request, res: Response, next: NextFunction): Promise
                                 $project: {
                                     rating: 1,
                                     review: 1,
-                                    perfume: 1,
+                                    userId: 1,
+                                    perfumeId: 1,
                                     createdAt: 1
                                 }
                             }
