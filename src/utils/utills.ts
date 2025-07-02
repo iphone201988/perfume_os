@@ -37,7 +37,9 @@ export const publicViewData = (user: IUser) => {
     reasonForWearPerfume: user.reasonForWearPerfume,
     referralSource: user.referralSource,
     referralCode: user.referralCode,
-    rankPoints: user.rankPoints
+    rankPoints: user.rankPoints,
+    tutorialProgess: user.tutorialProgess,
+    theme: user.theme
 
   }
 };
