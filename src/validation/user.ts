@@ -34,14 +34,16 @@ const registerValidation = {
       "string.email": "Invalid email format",
       "any.required": "Email is required",
     }),
-    password: Joi.string().min(6).required().messages({
+    password: Joi.string().min(6).regex(/[A-Z]/).regex(/[0-9]/).regex(/[@$!%*?&]/).required().messages({
       "string.base": "Password must be a string",
-      "string.min": "Password must be at least 6 characters long",
       "any.required": "Password is required",
+      "string.min": "Password must be at least 6 characters long",
+      "string.pattern.base": "Password must contain at least one uppercase letter, one number, and one special character",
     }),
-    username: Joi.string().required().messages({
+    username: Joi.string().regex(/^[A-Za-z][A-Za-z0-9@$!%*?&]*$/).required().messages({
       "string.base": "Username must be a string",
       "any.required": "Username is required",
+      "string.pattern.base": "Username cannot contain spaces, must not start with a number, and can only contain letters, numbers, and special characters (except at the start)",
     }),
     fullname: Joi.string().required().messages({
       "string.base": "Fullname must be a string",
@@ -62,9 +64,8 @@ const loginValidation = {
       "string.base": "Username must be a string",
       "any.required": "Username is required",
     }),
-    password: Joi.string().min(6).required().messages({
+    password: Joi.string().required().messages({
       "string.base": "Password must be a string",
-      "string.min": "Password must be at least 6 characters long",
       "any.required": "Password is required",
     }),
     deviceType: Joi.number().optional().messages({
@@ -89,13 +90,13 @@ const updateDataValidation = {
     tutorialProgess: Joi.number().optional().messages({
       "number.base": "Tutorial progress must be a number",
     }),
-    oldPassword: Joi.string().min(6).optional().messages({
+    oldPassword: Joi.string().optional().messages({
       "string.base": "Old password must be a string",
-      "string.min": "Password must be at least 6 characters long",
     }),
-    newPassword: Joi.string().min(6).optional().messages({
-      "string.base": "New password must be a string",
+    newPassword: Joi.string().min(6).regex(/[A-Z]/).regex(/[0-9]/).regex(/[@$!%*?&]/).optional().messages({
+      "string.base": "Password must be a string",
       "string.min": "Password must be at least 6 characters long",
+      "string.pattern.base": "Password must contain at least one uppercase letter, one number, and one special character",
     }),
     timezone: Joi.string().optional().messages({
       "string.base": "Timezone must be a string",
@@ -130,7 +131,7 @@ const updateDataValidation = {
       "string.base": "Referral source must be a string",
       "string.empty": "Referral source cannot be empty",
     }),
-    referredBy: Joi.string().optional().allow(null,"").messages({
+    referredBy: Joi.string().optional().allow(null, "").messages({
       "string.base": "Referred by must be a string",
     }),
   }).with("oldPassword", "newPassword")
@@ -139,8 +140,9 @@ const updateDataValidation = {
 
 const profileUpateValidation = {
   body: Joi.object({
-    username: Joi.string().optional().messages({
+    username: Joi.string().regex(/^[A-Za-z][A-Za-z0-9]*$/).optional().messages({
       "string.base": "Username must be a string",
+      "string.pattern.base": "Username cannot contain spaces, must not start with a number, and can only contain letters and numbers",
     }),
     fullname: Joi.string().optional().messages({
       "string.base": "Fullname must be a string",
@@ -184,18 +186,18 @@ const verifyOtpValidation = {
 
 const resetValidation = {
   body: Joi.object({
-    password: Joi.string().min(6).required().messages({
+   password: Joi.string().min(6).regex(/[A-Z]/).regex(/[0-9]/).regex(/[@$!%*?&]/).required().messages({
       "string.base": "Password must be a string",
-      "string.min": "Password must be at least 6 characters long",
       "any.required": "Password is required",
+      "string.min": "Password must be at least 6 characters long",
+      "string.pattern.base": "Password must contain at least one uppercase letter, one number, and one special character",
     }),
   }),
 };
 const deleteValidation = {
   query: Joi.object({
-    password: Joi.string().min(6).required().messages({
+    password: Joi.string().required().messages({
       "string.base": "Password must be a string",
-      "string.min": "Password must be at least 6 characters long",
       "any.required": "Password is required",
     }),
   }),
