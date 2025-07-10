@@ -95,5 +95,6 @@ const searchValidation = {
             "string.pattern.base": "Limit must be a number",
         }),
     }),
-}
-export default { writeReviewValidation, getPerfumeReviewsValidation, idValidation, similarValidation, getPerfumeValidation, searchValidation };
+};
+
+export default { writeReviewValidation, getPerfumeReviewsValidation, idValidation, similarValidation, getPerfumeValidation, searchValidation,  };

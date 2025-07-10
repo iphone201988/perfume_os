@@ -20,4 +20,5 @@ perfumeRouter.get("/perfumer", authMiddleware,validate(perfumeValidation.idValid
 perfumeRouter.get("/simillerPerfume", authMiddleware,validate(perfumeValidation.similarValidation), perfumeController.simillerPerfume);
 
 
+
 export default perfumeRouter

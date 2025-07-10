@@ -186,7 +186,7 @@ const verifyOtpValidation = {
 
 const resetValidation = {
   body: Joi.object({
-   password: Joi.string().min(6).regex(/[A-Z]/).regex(/[0-9]/).regex(/[@$!%*?&]/).required().messages({
+    password: Joi.string().min(6).regex(/[A-Z]/).regex(/[0-9]/).regex(/[@$!%*?&]/).required().messages({
       "string.base": "Password must be a string",
       "any.required": "Password is required",
       "string.min": "Password must be at least 6 characters long",
@@ -240,7 +240,36 @@ const userDataValidation = {
     })
   }),
 };
-
+const favoriteValidation = {
+  body: Joi.object({
+    id: Joi.string().required().messages({
+      "string.base": "ID must be a string",
+      "any.required": "ID is required",
+    }),
+    type: Joi.string().valid("perfume", "note", "perfumer").required().messages({
+      "string.base": "Type must be a string",
+      "any.required": "Type is required",
+      "any.only": "Invalid type",
+    }),
+  }),
+};
+const getFavoriteValidation = {
+  query: Joi.object({
+    type: Joi.string().valid("perfume", "note", "perfumer").required().messages({
+      "string.base": "Type must be a string",
+      "any.required": "Type is required",
+      "any.only": "Invalid type",
+    }),
+    page: Joi.string().pattern(/^[0-9]+$/).optional().messages({
+      "string.base": "Page must be a string",
+      "string.pattern.base": "Page must be a number",
+    }),
+    limit: Joi.string().pattern(/^[0-9]+$/).optional().messages({
+      "string.base": "Limit must be a string",
+      "string.pattern.base": "Limit must be a number",
+    }),
+  }),
+};
 export default {
   socialLoginValidation,
   registerValidation,
@@ -253,5 +282,6 @@ export default {
   followValidation,
   collectionValidation,
   deleteValidation,
-  userDataValidation
+  userDataValidation,
+  favoriteValidation, getFavoriteValidation
 };

@@ -12,7 +12,8 @@ export const upload = multer({
       cb(null, uploadPath);
     },
     filename: function (req, file, cb) {
-      cb(null, file.originalname);
+      const uniqueSuffix = Date.now() + '-' + file.originalname;
+      cb(null, uniqueSuffix);
     },
   }),
 });

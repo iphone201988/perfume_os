@@ -128,7 +128,7 @@ const profile = async (req: Request, res: Response, next: NextFunction): Promise
             WishlistModel.find({ userId: viewedUser._id }).sort({ createdAt: -1 }).limit(12).populate("perfumeId", "name brand image").lean(),
             UserBadgesModel.countDocuments({ userId: viewedUser._id }),
             UserBadgesModel.find({ userId: viewedUser._id }).sort({ createdAt: -1 }).limit(12).populate("badgeId").lean(),
-            FollowModel.exists({ userId: currentUser._id, following: viewedUser._id }),
+            FollowModel.exists({ userId: currentUser._id, followId: viewedUser._id }),
             FollowModel.countDocuments({ followId: viewedUser._id }),
             FollowModel.countDocuments({ userId: viewedUser._id }),
             ReviewModel.aggregate([
@@ -237,7 +237,7 @@ export const getUserProfile = async (userId: string, currentUser: IUser | null):
             WishlistModel.find({ userId: viewedUser._id }).sort({ createdAt: -1 }).limit(12).populate("perfumeId", "name brand image").lean(),
             UserBadgesModel.countDocuments({ userId: viewedUser._id }),
             UserBadgesModel.find({ userId: viewedUser._id }).sort({ createdAt: -1 }).limit(12).populate("badgeId").lean(),
-            FollowModel.exists({ userId: currentUser?._id, following: viewedUser._id }),
+            FollowModel.exists({ userId: currentUser?._id, followId: viewedUser._id }),
             FollowModel.countDocuments({ followId: viewedUser._id }),
             FollowModel.countDocuments({ userId: viewedUser._id }),
             ReviewModel.aggregate([
@@ -471,11 +471,12 @@ const followUser = async (req: Request, res: Response, next: NextFunction): Prom
         if (!followingUser) {
             throw new BadRequestError("User does not exist");
         }
-        const isFollowing = await FollowModel.findOne({ user: user._id, following: followingUser._id });
+        const isFollowing = await FollowModel.findOne({ userId: user._id, followId: followingUser._id });
         if (isFollowing) {
             await FollowModel.findByIdAndDelete(isFollowing._id);
         } else {
-            await FollowModel.create({ user: user._id, following: followingUser._id });
+            console.log("isFollowing", followingUser);
+            await FollowModel.create({ userId: user._id, followId: followingUser._id });
         }
         const data = await getUserProfile(user._id.toString(), user)
         emitGetProfile(user._id.toString(), data)

@@ -9,6 +9,7 @@ import SearchModel from "../model/Search";
 import WishlistModel from "../model/Wishlist";
 import CollectionModel from "../model/Collection";
 import PerfumersModel from "../model/Perfumers";
+import FavoritesModel from "../model/Favorites";
 
 
 
@@ -244,7 +245,7 @@ const getPerfumer = async (req: Request, res: Response, next: NextFunction): Pro
             .limit(10)
             .lean();
         const totalCount = await PerfumeModel.countDocuments({ "perfumers.perfumerId": id });
-        SUCCESS(res, 200, "Perfumer fetched successfully", { data: {perfumer, perfumes, totalCount} });
+        SUCCESS(res, 200, "Perfumer fetched successfully", { data: { perfumer, perfumes, totalCount } });
     } catch (error) {
         next(error);
     }
@@ -283,12 +284,133 @@ const simillerPerfume = async (req: Request, res: Response, next: NextFunction):
                 ]
             }).skip(skip)
                 .limit(10)
-                .select('name brand image') 
+                .select('name brand image')
                 .lean();
             SUCCESS(res, 200, "Similler Perfumes fetched successfully", { data: perfumes });
         } else {
             throw new BadRequestError("Type not found");
         }
+    } catch (error) {
+        next(error);
+    }
+};
+const addFavorite = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const { id, type } = req.body;
+        const userId = req.userId;
+
+        if (!["perfume", "note", "perfumer"].includes(type)) {
+            throw new BadRequestError("Invalid favorite type");
+        }
+
+        const modelMap: Record<string, any> = {
+            perfume: PerfumeModel,
+            note: NotesModel,
+            perfumer: PerfumersModel,
+        };
+
+        const idFieldMap: Record<string, string> = {
+            perfume: "perfumeId",
+            note: "noteId",
+            perfumer: "perfumerId",
+        };
+
+        const Model = modelMap[type];
+        const item = await Model.findById(id).lean();
+        if (!item) {
+            throw new BadRequestError(`${type.charAt(0).toUpperCase() + type.slice(1)} not found`);
+        }
+
+        const query: any = { userId, [idFieldMap[type]]: id, type };
+        const existingFavorite = await FavoritesModel.findOne(query).lean();
+
+        if (existingFavorite) {
+            await FavoritesModel.findByIdAndDelete(existingFavorite._id);
+            return SUCCESS(res, 200, "Favorite removed successfully");
+        } else {
+            await FavoritesModel.create(query);
+            return SUCCESS(res, 200, "Favorite added successfully");
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+const getFavorites = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const userId = req.userId;
+        const { type, page = "1", limit = "10" } = req.query;
+        const currentPage = Math.max(Number(page), 1);
+        const perPage = Math.max(Number(limit), 1);
+        const skip = (currentPage - 1) * perPage;
+        const result = await FavoritesModel.aggregate([
+            {
+                $match: {
+                    userId: userId,
+                    type: type
+                }
+            }, {
+                $facet: {
+                    favorites: [
+                        { $sort: { createdAt: -1 } },
+                        { $skip: skip },
+                        { $limit: perPage },
+                        {
+                            $lookup: {
+                                from: 'Perfume',
+                                localField: 'perfumeId',
+                                foreignField: '_id',
+                                as: 'perfumeId'
+                            }
+                        },
+                        {
+                            $lookup: {
+                                from: 'Notes',
+                                localField: 'noteId',
+                                foreignField: '_id',
+                                as: 'noteId'
+                            }
+                        },
+                        {
+                            $lookup: {
+                                from: 'Perfumers',
+                                localField: 'perfumerId',
+                                foreignField: '_id',
+                                as: 'perfumerId'
+                            }
+                        },
+                        {
+                            $unwind: {
+                                path: '$perfumeId',
+                                preserveNullAndEmptyArrays: true
+                            }
+                        },
+                        {
+                            $unwind: {
+                                path: '$noteId',
+                                preserveNullAndEmptyArrays: true
+                            }
+                        },
+                        {
+                            $unwind: {
+                                path: '$perfumerId',
+                                preserveNullAndEmptyArrays: true
+                            }
+                        }
+                    ],
+                    totalCount: [
+                        {
+                            $count: 'count'
+                        }
+                    ]
+                }
+            }
+
+        ]);
+
+        const totalCount = result[0]?.totalCount[0]?.count || 0;
+        const favorites = result[0]?.favorites || [];
+        SUCCESS(res, 200, "Favorites fetched successfully", { data: { favorites, pagination: { totalCount, currentPage, perPage } } });
+        SUCCESS(res, 200, "Favorites fetched successfully", { data: {} });
     } catch (error) {
         next(error);
     }
@@ -464,4 +586,4 @@ const simillerPerfume = async (req: Request, res: Response, next: NextFunction):
 
 // changeInPerfume();
 
-export default { perfume, recentAndTopSearches, searchPerfume, writeReview, getPerfumeReviews, getNotes, getPerfumer,simillerPerfume };
+export default { perfume, recentAndTopSearches, searchPerfume, writeReview, getPerfumeReviews, getNotes, getPerfumer, simillerPerfume, addFavorite, getFavorites };
