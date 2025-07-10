@@ -32,6 +32,7 @@ const UserSchema = new mongoose.Schema<IUser>({
     rankPoints: { type: Number, default: 0 },
     tutorialProgess: { type: Number, default: 0 },
     theme: { type: String, default: "light" },
+    rankName: { type: String, default: null },
 }, { timestamps: true });
 
 

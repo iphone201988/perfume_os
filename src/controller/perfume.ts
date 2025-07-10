@@ -14,7 +14,7 @@ import FavoritesModel from "../model/Favorites";
 
 
 // get perfume
-const perfume = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+const perfume = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
         const { name, brand, perfumeId, isSearch = "false" } = req.query;
 
@@ -29,7 +29,7 @@ const perfume = async (req: Request, res: Response, next: NextFunction): Promise
         const perfume: any = await PerfumeModel.findOne(query).lean();
 
         if (!perfume) {
-            return next(new BadRequestError("Perfume not found"));
+            return res.status(200).json({ success: false, message: "Perfume not found in database" });
         }
 
         // Populate note information by fetching all notes at once

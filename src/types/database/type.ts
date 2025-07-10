@@ -35,6 +35,7 @@ export interface IUser extends Document {
     rankPoints: number; 
     tutorialProgess: number;
     theme: "light" | "dark";
+    rankName: string | null;
     createdAt: Date;
     updatedAt: Date;
 }
