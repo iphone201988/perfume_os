@@ -10,6 +10,8 @@ import WishlistModel from "../model/Wishlist";
 import CollectionModel from "../model/Collection";
 import PerfumersModel from "../model/Perfumers";
 import FavoritesModel from "../model/Favorites";
+import { getUserProfile } from "./user";
+import { emitGetProfile } from "../services/socketManager";
 
 
 
@@ -177,11 +179,14 @@ const recentAndTopSearches = async (req: Request, res: Response, next: NextFunct
 //write review
 const writeReview = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+        const user = req.user;
         const perfume = await PerfumeModel.findById(req.body.perfumeId);
         if (!perfume) {
             throw new BadRequestError("Perfume not found");
         }
         const review = await ReviewModel.create({ ...req.body, userId: req.user._id, datePublished: new Date(), authorImage: req.user.profileImage, authorName: req.user.fullname });
+        const data = await getUserProfile(user._id.toString(), user)
+        emitGetProfile(user._id.toString(), data)
         SUCCESS(res, 200, "Review added successfully", { data: review });
     } catch (error) {
         next(error);

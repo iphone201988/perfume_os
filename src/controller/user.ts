@@ -241,44 +241,64 @@ export const getUserProfile = async (userId: string, currentUser: IUser | null):
             FollowModel.countDocuments({ followId: viewedUser._id }),
             FollowModel.countDocuments({ userId: viewedUser._id }),
             ReviewModel.aggregate([
-                { $match: { userId: viewedUser._id } },
+                {
+                    $match: { userId: viewedUser._id }
+                },
                 {
                     $lookup: {
                         from: "Perfume",
                         localField: "perfumeId",
                         foreignField: "_id",
-                        as: "perfume",
+                        as: "perfumeId",
                         pipeline: [{ $project: { name: 1, brand: 1, image: 1 } }]
                     }
                 },
-                { $unwind: { path: "$perfume", preserveNullAndEmptyArrays: true } },
+                { $unwind: { path: "$perfumeId", preserveNullAndEmptyArrays: true } },
                 {
                     $lookup: {
                         from: "User",
                         localField: "userId",
                         foreignField: "_id",
-                        as: "perfume",
+                        as: "userId",
                         pipeline: [{ $project: { fullname: 1, profileImage: 1 } }]
                     }
                 },
-                { $unwind: { path: "$perfume", preserveNullAndEmptyArrays: true } },
+                { $unwind: { path: "$userId", preserveNullAndEmptyArrays: true } },
                 {
                     $facet: {
                         reviewsList: [
                             { $sort: { createdAt: -1 } },
-                            { $limit: 12 },
-                            { $project: { rating: 1, review: 1, perfume: 1, createdAt: 1 } }
+                            { $limit: 5 },
+                            {
+                                $project: {
+                                    rating: 1,
+                                    review: 1,
+                                    userId: 1,
+                                    perfumeId: 1,
+                                    createdAt: 1
+                                }
+                            }
                         ],
                         stats: [
-                            { $group: { _id: null, totalReviews: { $sum: 1 }, averageRating: { $avg: "$rating" } } }
+                            {
+                                $group: {
+                                    _id: null,
+                                    totalReviews: { $sum: 1 },
+                                    averageRating: { $avg: "$rating" }
+                                }
+                            }
                         ]
                     }
                 },
                 {
                     $project: {
-                        reviews: "$reviewsList",
-                        totalReviews: { $ifNull: [{ $arrayElemAt: ["$stats.totalReviews", 0] }, 0] },
-                        averageRating: { $ifNull: [{ $arrayElemAt: ["$stats.averageRating", 0] }, 0] }
+                        reviews: "$reviewsList", // flatten to a top-level "reviews" array
+                        totalReviews: {
+                            $ifNull: [{ $arrayElemAt: ["$stats.totalReviews", 0] }, 0]
+                        },
+                        averageRating: {
+                            $ifNull: [{ $arrayElemAt: ["$stats.averageRating", 0] }, 0]
+                        }
                     }
                 }
             ])
@@ -594,7 +614,7 @@ const userData = async (req: Request, res: Response, next: NextFunction): Promis
             SUCCESS(res, 200, "Badge fetched successfully", {
                 data: { badges, pagination: { totalCount, currentPage, perPage } }
             });
-        }else{
+        } else {
             throw new BadRequestError("Invalid type");
         }
     } catch (error) {
