@@ -71,7 +71,7 @@ const perfume = async (req: Request, res: Response, next: NextFunction): Promise
             }
 
         ]);
-        perfume.totalReviewsAndRatings = totalReviewsAndRatings[0] || { totalReviews: 0, totalRatings: 0 };
+        perfume.totalReviewsAndRatings = totalReviewsAndRatings[0] || { totalReviews: 0, averageRating: 0 };
         perfume.isWishlist = (await WishlistModel.findOne({ userId: req.user._id, perfumeId: perfume._id })) ? true : false;
         perfume.isCollection = (await CollectionModel.findOne({ userId: req.user._id, perfumeId: perfume._id })) ? true : false;
         // same brand perfumes
