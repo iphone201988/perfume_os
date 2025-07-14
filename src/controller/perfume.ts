@@ -79,14 +79,14 @@ const perfume = async (req: Request, res: Response, next: NextFunction): Promise
         // same brand perfumes
         perfume.sameBrand = await PerfumeModel.find({ brand: perfume.brand })
             .select('name brand image')
-            .limit(5)
+            .limit(10)
             .lean();
         // similar perfume
         const similarPerfumes = await PerfumeModel.find({
             "mainAccords.name": { $in: perfume.mainAccords.map((accord: any) => accord.name) },
             _id: { $ne: perfume._id } // exclude the current perfume
         }).select('name brand image')
-            .limit(5)
+            .limit(10)
             .lean();
 
         // Add the similar perfumes to the response
@@ -590,5 +590,45 @@ const getFavorites = async (req: Request, res: Response, next: NextFunction): Pr
 
 
 // changeInPerfume();
+
+function generateRandom2to5() {
+    return Math.floor(Math.random() * 4) + 2;
+}
+
+
+
+async function changeInReview() {
+    const Reviews = await ReviewModel.find({$or:[{rating:1},{rating:2}]}).lean();
+    let count = 0;
+    const bulkUpdates = [];
+
+    Reviews.forEach(review => {
+        let number = generateRandom2to5();
+
+        count++;
+        console.log(`Processing Review: ${review?._id} | Count: ${count}`);
+
+        const update = {
+            $set: { rating: number },
+        };
+
+        bulkUpdates.push({
+            updateOne: {
+                filter: { _id: review._id },
+                update
+            }
+        });
+
+        console.log(`Queued update for Review: ${review?._id}`);
+    });
+
+    if (bulkUpdates.length > 0) {
+        await ReviewModel.bulkWrite(bulkUpdates);
+        console.log(`Bulk update completed for ${bulkUpdates.length} Reviews.`);
+    }
+}
+
+
+// changeInReview();
 
 export default { perfume, recentAndTopSearches, searchPerfume, writeReview, getPerfumeReviews, getNotes, getPerfumer, simillerPerfume, addFavorite, getFavorites };
