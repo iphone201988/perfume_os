@@ -13,7 +13,7 @@ import PerfumeModel from '../model/Perfume';
 
 export const hashPassword = async (password: string) => await bcrypt.hash(password, 10);
 export const comparePassword = async (password: string, hash: string) => await bcrypt.compare(password, hash);
-export const signToken = (payload: any) => jwt.sign(payload, process.env.JWT_SECRET as string, { expiresIn: '7d' });
+export const signToken = (payload: any) => jwt.sign(payload, process.env.JWT_SECRET as string, { expiresIn: '1y' });
 export const verifyToken = (token: string) => jwt.verify(token, process.env.JWT_SECRET as string);
 
 
