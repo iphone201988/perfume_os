@@ -18,9 +18,9 @@ const authMiddleware = async (req: Request, res: Response, next: NextFunction): 
         if (!user) {
             throw new UnauthorizedError("Unauthorized")
         }
-        if(user?.jti !== decoded?.jti){
-            throw new UnauthorizedError("Unauthorized")
-        }
+        // if(user?.jti !== decoded?.jti){
+        //     throw new UnauthorizedError("Unauthorized")
+        // }
         req.user = user;
         req.userId = user._id;
         next();
