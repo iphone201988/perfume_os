@@ -52,6 +52,7 @@ const perfume = async (req: Request, res: Response, next: NextFunction): Promise
         for (let perfumer of perfume.perfumers) {
             perfumer.perfumerId = await PerfumersModel.findById(perfumer.perfumerId).lean();
         }
+        perfume.perfumers =  perfume?.perfumers?.filter(p => p.perfumerId !== null);
         perfume.reviews = await ReviewModel.find({ perfumeId: perfume._id }).sort({ datePublished: -1 }).limit(10).lean();
         const totalReviewsAndRatings = await ReviewModel.aggregate([
             {
