@@ -40,7 +40,7 @@ const registerValidation = {
       "string.min": "Password must be at least 6 characters long",
       "string.pattern.base": "Password must contain at least one uppercase letter, one number, and one special character",
     }),
-    username: Joi.string().regex(/^[A-Za-z][A-Za-z0-9@$!%*?&_.]*$/).required().messages({
+    username: Joi.string().regex(/^[A-Za-z][A-Za-z0-9@$!%*?&_-]*$/).required().messages({
       "string.base": "Username must be a string",
       "any.required": "Username is required",
       "string.pattern.base": "Conatins invalid characters",
@@ -140,9 +140,9 @@ const updateDataValidation = {
 
 const profileUpateValidation = {
   body: Joi.object({
-    username: Joi.string().regex(/^[A-Za-z][A-Za-z0-9]*$/).optional().messages({
+    username: Joi.string().regex(/^[A-Za-z][A-Za-z0-9@$!%*?&_-]*$/).optional().messages({
       "string.base": "Username must be a string",
-      "string.pattern.base": "Username cannot contain spaces, must not start with a number, and can only contain letters and numbers",
+      "string.pattern.base": "Conatins invalid characters",
     }),
     fullname: Joi.string().optional().messages({
       "string.base": "Fullname must be a string",
