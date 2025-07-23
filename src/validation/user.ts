@@ -43,7 +43,7 @@ const registerValidation = {
     username: Joi.string().regex(/^[A-Za-z][A-Za-z0-9@$!%*?&]*$/).required().messages({
       "string.base": "Username must be a string",
       "any.required": "Username is required",
-      "string.pattern.base": "Username cannot contain spaces, must not start with a number, and can only contain letters, numbers, and special characters (except at the start)",
+      "string.pattern.base": "Username cannot contain spaces, must not start with a number, and can only contain letters, numbers, and special characters[@,$,!,%,*,?,&] (except at the start)",
     }),
     fullname: Joi.string().required().messages({
       "string.base": "Fullname must be a string",
@@ -270,6 +270,36 @@ const getFavoriteValidation = {
     }),
   }),
 };
+
+const submitQuizValidation = {
+  body: Joi.object({
+    type: Joi.string().required().valid("classic", "scent_or_not", "guess_bottle").messages({
+      "string.base": "Type must be a string",
+      "any.required": "Type is required",
+      "any.only": "Invalid type",
+    }),
+    mode: Joi.string().required().valid("quick", "ranked").messages({
+      "string.base": "Mode must be a string",
+      "any.required": "Mode is required",
+      "any.only": "Invalid mode",
+    }),
+   answers: Joi.array().items(
+      Joi.object({
+        questionId: Joi.string().required().messages({
+          "string.base": "Question ID must be a string",
+          "any.required": "Question ID is required",
+        }),
+        selectedAnswer: Joi.string().required().messages({
+          "string.base": "Answer must be a string",
+          "any.required": "Answer is required",
+        }),
+      })
+    ).required().messages({
+      "array.base": "Answers must be an array",
+      "any.required": "Answers are required",
+    }),
+  }),
+}
 export default {
   socialLoginValidation,
   registerValidation,
@@ -283,5 +313,5 @@ export default {
   collectionValidation,
   deleteValidation,
   userDataValidation,
-  favoriteValidation, getFavoriteValidation
+  favoriteValidation, getFavoriteValidation,submitQuizValidation  
 };
