@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { comparePassword, findPerfumeById, findUserByEmail, findUserById, findUserByReferral, findUserBySocialId, findUserByUsername, generateOtp, hashPassword, otpExpiry, publicViewData, signToken, } from "../utils/utills";
+import { comparePassword, findPerfumeById, findUserByEmail, findUserById, findUserByReferral, findUserBySocialId, findUserByUsername, generateOtp, /* getRankName, */ hashPassword, otpExpiry, publicViewData, signToken, } from "../utils/utills";
 import UserModel from "../model/User";
 import PerfumeModel from "../model/Perfume";
 import { SUCCESS } from "../utils/response";
@@ -13,6 +13,9 @@ import { IUser } from "../types/database/type";
 import BadgesModel from "../model/Badges";
 import UserBadgesModel from "../model/UserBadges";
 import { emitGetProfile } from "../services/socketManager";
+// import QuestionModel from "../model/QuestionModel";
+// import QuizModel from "../model/QuizModel";
+import mongoose from "mongoose";
 //social login
 const socialLogin = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
@@ -339,6 +342,10 @@ export const updateUserData = async (req: Request, res: Response, next: NextFunc
             if (!isMatch) {
                 throw new BadRequestError("Incorrect password");
             }
+            // new password and current password are not same
+            if (oldPassword === newPassword) {
+                throw new BadRequestError("New password cannot be same as old password");
+            }
             user.password = await hashPassword(newPassword);
         }
         if (updateData?.referredBy) {
@@ -454,6 +461,11 @@ const resetPassword = async (req: Request, res: Response, next: NextFunction): P
         const user = req.user;
         if (!req.body.password) {
             throw new BadRequestError("Password is required");
+        }
+        // password or current password not same 
+        const isMatch = await comparePassword(req.body.password, user.password);
+        if (isMatch) {
+            throw new BadRequestError("New password cannot be same as old password");
         }
         user.password = await hashPassword(req.body.password);
         await user.save();
@@ -622,9 +634,79 @@ const userData = async (req: Request, res: Response, next: NextFunction): Promis
         next(error);
     }
 }
+// const submitUserQuiz = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+//     try {
+//         const user = req.user;
+//         const { type, mode, answers } = req.body;
+
+//         const totalQuestions = answers.length;
+//         let correctAnswers = 0;
+//         const formattedQuestions = [];
+
+//         for (const ans of answers) {
+//             const question = await QuestionModel.findById(ans.questionId);
+//             if (!question) continue;
+//             const isCorrect = ans.selectedAnswer?.toLowerCase() === question.correctAnswer?.toLowerCase();
+//             if (isCorrect) correctAnswers++;
+
+//             formattedQuestions.push({
+//                 questionId: ans.questionId,
+//                 correctAnswer: question.correctAnswer,
+//                 selectedAnswer: ans.selectedAnswer,
+//                 isCorrect,
+//             });
+//         }
+
+//         const passed = correctAnswers >= 7;
+//         let pointsEarned = 0;
+
+//         if (mode === "quick") pointsEarned = passed ? 20 : 0;
+//         if (mode === "ranked") pointsEarned = passed ? 100 : -50;
+
+//         const previousPoints = user?.rankPoints || 0;
+//         const newPoints = Math.max(0, previousPoints + pointsEarned);
+//         const rankName = getRankName(newPoints);
+
+//         await QuizModel.create({
+//             userId: user._id,
+//             type,
+//             mode,
+//             questions: formattedQuestions,
+//             totalQuestions,
+//             correctAnswers,
+//             score: correctAnswers * 10,
+//             status: passed ? "pass" : "fail",
+//             pointsEarned,
+//         });
+
+//         await UserModel.findByIdAndUpdate(user._id, { rankPoints: newPoints, rankName });
+//         SUCCESS(res, 200, "Quiz submitted successfully", {});
+//     }
+//     catch (error) {
+//         console.log("error in userData", error);
+//         next(error);
+//     }
+// };
+// const getQuestions = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+//     try {
+//         const userId = req.userId;
+//         const userQuizRecords = await QuizModel.find({ userId }).select("questions.questionId").lean();
+//         const attemptedQuestionIds = userQuizRecords
+//             .flatMap(record => record.questions.map(q => q.questionId?.toString()))
+//             .filter(Boolean);
+//         const questions = await QuestionModel.aggregate([
+//             { $match: { _id: { $nin: attemptedQuestionIds.map(id => new mongoose.Types.ObjectId(id)) }, isDeleted: false } },
+//             { $sample: { size: 10 } },
+//         ]);
+//         if (questions?.length <= 10) throw new BadRequestError("No more questions available");
+//         SUCCESS(res, 200, "Question fetched successfully", { data: questions });
+//     } catch (error) {
+//         next(error);
+//     }
+// };
 
 export default {
     register, login, profile, updateUserData, uploadImage,
     forgetPassword, verifyOtp, resetPassword, profileUpdate, socialLogin, deleteUser,
-    followUser, addCollection, addWishlist, userData
+    followUser, addCollection, addWishlist, userData, /* submitUserQuiz, getQuestions */
 };
