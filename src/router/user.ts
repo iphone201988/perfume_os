@@ -37,4 +37,8 @@ userRouter.get("/userData", authMiddleware, validate(userValidation.userDataVali
 userRouter.post("/favorite", authMiddleware, validate(userValidation.favoriteValidation), perfumeController.addFavorite);
 userRouter.get("/favorite", authMiddleware, validate(userValidation.getFavoriteValidation), perfumeController.getFavorites);
 
+
+// //  user question
+// userRouter.post("/submitQuiz", authMiddleware, validate(userValidation.submitQuizValidation), userController.submitUserQuiz);
+// userRouter.get("/quiz", authMiddleware, userController.getQuestions);
 export default userRouter
