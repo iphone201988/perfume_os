@@ -255,9 +255,8 @@ const favoriteValidation = {
 };
 const getFavoriteValidation = {
   query: Joi.object({
-    type: Joi.string().valid("perfume", "note", "perfumer").required().messages({
+    type: Joi.string().valid("perfume", "note", "perfumer", "article").optional().messages({
       "string.base": "Type must be a string",
-      "any.required": "Type is required",
       "any.only": "Invalid type",
     }),
     page: Joi.string().pattern(/^[0-9]+$/).optional().messages({

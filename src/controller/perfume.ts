@@ -12,6 +12,7 @@ import PerfumersModel from "../model/Perfumers";
 import FavoritesModel from "../model/Favorites";
 import { getUserProfile } from "./user";
 import { emitGetProfile } from "../services/socketManager";
+import ArticlesModel from "../model/Articles";
 
 
 
@@ -314,6 +315,7 @@ const addFavorite = async (req: Request, res: Response, next: NextFunction): Pro
             perfume: { model: PerfumeModel, favField: "perfumeId", singularName: "Perfume" },
             note: { model: NotesModel, favField: "noteId", singularName: "Note" },
             perfumer: { model: PerfumersModel, favField: "perfumerId", singularName: "Perfumer" },
+            article: { model: ArticlesModel, favField: "articleId", singularName: "Acticle" },
         };
 
         const typeInfo = typeMap[type];
