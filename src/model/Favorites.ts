@@ -6,6 +6,7 @@ const FavoritesSchema = new mongoose.Schema({
     perfumeId: { type: Schema.Types.ObjectId, ref: "Perfume" , default: null },
     perfumerId: { type: Schema.Types.ObjectId, ref: "Perfumers" , default: null },
     noteId: { type: Schema.Types.ObjectId, ref: "Notes" , default: null },
+    articleId: { type: Schema.Types.ObjectId, ref: "Articles" , default: null },
     createdAt: { type: Date, default: Date.now },
 });
 
