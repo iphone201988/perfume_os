@@ -16,6 +16,9 @@ import { emitGetProfile } from "../services/socketManager";
 // import QuestionModel from "../model/QuestionModel";
 // import QuizModel from "../model/QuizModel";
 import mongoose from "mongoose";
+import FavoritesModel from "../model/Favorites";
+import PerfumersModel from "../model/Perfumers";
+import NotesModel from "../model/Notes";
 //social login
 const socialLogin = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
@@ -124,7 +127,7 @@ const profile = async (req: Request, res: Response, next: NextFunction): Promise
         }
         const data: any = publicViewData(viewedUser);
 
-        const [totalCollection, collections, totalWishlist, wishlists, totalBadges, badges, isFollowing, followers, following, reviewDataAgg] = await Promise.all([
+        const [totalCollection, collections, totalWishlist, wishlists, totalBadges, badges, isFollowing, followers, following, reviewDataAgg, favorites, totalFavorites] = await Promise.all([
             CollectionModel.countDocuments({ userId: viewedUser._id }),
             CollectionModel.find({ userId: viewedUser._id }).sort({ createdAt: -1 }).limit(12).populate("perfumeId", "name brand image").lean(),
             WishlistModel.countDocuments({ userId: viewedUser._id }),
@@ -195,7 +198,9 @@ const profile = async (req: Request, res: Response, next: NextFunction): Promise
                         }
                     }
                 }
-            ])
+            ]),
+            FavoritesModel.find({ userId: viewedUser._id}).populate("perfumeId", "name brand image").populate("perfumerId", "name smallImage").populate("noteId", "name image").populate("articleId", "title image").limit(12).lean(),
+            FavoritesModel.countDocuments({ userId: viewedUser._id })
         ]);
         const { reviews = [], totalReviews = 0, averageRating = 0 } = reviewDataAgg[0] || {}
         Object.assign(data, {
@@ -210,7 +215,9 @@ const profile = async (req: Request, res: Response, next: NextFunction): Promise
             following,
             reviews,
             totalReviews,
-            averageRating
+            averageRating,
+            favorites,
+            totalFavorites
         });
 
         SUCCESS(res, 200, "Profile fetched successfully", { data });
@@ -232,7 +239,7 @@ export const getUserProfile = async (userId: string, currentUser: IUser | null):
         // Fetch required data concurrently using Promise.all
         const [
             totalCollection, collections, totalWishlist, wishlists, totalBadges, badges,
-            isFollowing, followers, following, reviewDataAgg
+            isFollowing, followers, following, reviewDataAgg, favorites, totalFavorites
         ] = await Promise.all([
             CollectionModel.countDocuments({ userId: viewedUser._id }),
             CollectionModel.find({ userId: viewedUser._id }).sort({ createdAt: -1 }).limit(12).populate("perfumeId", "name brand image").lean(),
@@ -304,7 +311,9 @@ export const getUserProfile = async (userId: string, currentUser: IUser | null):
                         }
                     }
                 }
-            ])
+            ]),
+            FavoritesModel.find({ userId: viewedUser._id}).populate("perfumeId", "name brand image").populate("perfumerId", "name smallImage").populate("noteId", "name image").populate("articleId", "title image").limit(12).lean(),
+            FavoritesModel.countDocuments({ userId: viewedUser._id })
         ]);
 
         // Extract review data
@@ -323,7 +332,9 @@ export const getUserProfile = async (userId: string, currentUser: IUser | null):
             following,
             reviews,
             totalReviews,
-            averageRating
+            averageRating,
+            favorites,
+            totalFavorites
         });
 
         return data;
@@ -708,5 +719,5 @@ const userData = async (req: Request, res: Response, next: NextFunction): Promis
 export default {
     register, login, profile, updateUserData, uploadImage,
     forgetPassword, verifyOtp, resetPassword, profileUpdate, socialLogin, deleteUser,
-    followUser, addCollection, addWishlist, userData, /* submitUserQuiz, getQuestions */
+    followUser, addCollection, addWishlist, userData, /* submitUserQuiz, getQuestions,  */
 };

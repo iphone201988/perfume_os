@@ -301,45 +301,55 @@ const simillerPerfume = async (req: Request, res: Response, next: NextFunction):
     }
 };
 const addFavorite = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    try {
-        const { id, type } = req.body;
-        const userId = req.userId;
+  try {
+    const user = req.user;
+    const { id, type } = req.body;
 
-        if (!["perfume", "note", "perfumer"].includes(type)) {
-            throw new BadRequestError("Invalid favorite type");
-        }
-
-        const modelMap: Record<string, any> = {
-            perfume: PerfumeModel,
-            note: NotesModel,
-            perfumer: PerfumersModel,
-        };
-
-        const idFieldMap: Record<string, string> = {
-            perfume: "perfumeId",
-            note: "noteId",
-            perfumer: "perfumerId",
-        };
-
-        const Model = modelMap[type];
-        const item = await Model.findById(id).lean();
-        if (!item) {
-            throw new BadRequestError(`${type.charAt(0).toUpperCase() + type.slice(1)} not found`);
-        }
-
-        const query: any = { userId, [idFieldMap[type]]: id, type };
-        const existingFavorite = await FavoritesModel.findOne(query).lean();
-
-        if (existingFavorite) {
-            await FavoritesModel.findByIdAndDelete(existingFavorite._id);
-            return SUCCESS(res, 200, "Favorite removed successfully");
-        } else {
-            await FavoritesModel.create(query);
-            return SUCCESS(res, 200, "Favorite added successfully");
-        }
-    } catch (error) {
-        next(error);
+    if (!user || !user._id) {
+      throw new BadRequestError("User not authenticated");
     }
+
+    // Map type to model & field name in FavoritesModel
+    const typeMap: Record<string, { model: any; favField: string; singularName: string }> = {
+      perfume: { model: PerfumeModel, favField: "perfumeId", singularName: "Perfume" },
+      note: { model: NotesModel, favField: "noteId", singularName: "Note" },
+      perfumer: { model: PerfumersModel, favField: "perfumerId", singularName: "Perfumer" },
+    };
+
+    const typeInfo = typeMap[type];
+    if (!typeInfo) {
+      throw new BadRequestError("Invalid favorite type");
+    }
+
+    const item = await typeInfo.model.findById(id);
+    if (!item) {
+      throw new BadRequestError(`${typeInfo.singularName} does not exist`);
+    }
+
+    const favQuery = { [typeInfo.favField]: id, userId: user._id };
+    const existingFavorite = await FavoritesModel.findOne(favQuery);
+
+    if (existingFavorite) {
+      await FavoritesModel.findByIdAndDelete(existingFavorite._id);
+      return SUCCESS(
+        res,
+        200,
+        `${typeInfo.singularName} removed from favorite successfully`,
+        {}
+      );
+    }
+
+    await FavoritesModel.create({ [typeInfo.favField]: id, userId: user._id, type });
+    return SUCCESS(
+      res,
+      200,
+      `${typeInfo.singularName} added to favorite successfully`,
+      {}
+    );
+  } catch (error) {
+    console.error("error in addFavorite", error);
+    next(error);
+  }
 };
 const getFavorites = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -426,8 +436,14 @@ const getFavorites = async (req: Request, res: Response, next: NextFunction): Pr
 //     const notesList = await NotesModel.find({}).lean();
 //     const noteMap = new Map(notesList.map(note => [note.name.toLowerCase().trim(), note._id]));
 
-//     const perfumes = await PerfumeModel.find({}).lean();
-//     let count = 0;
+//  const perfumes = await PerfumeModel.find({
+//         $or: [
+//             { 'notes.base.noteId': { $exists: false } },
+//             { 'notes.top.noteId': { $exists: false } },
+//             { 'notes.middle.noteId': { $exists: false } },
+//             { 'notes.notes.noteId': { $exists: false } }
+//         ]
+//     }).lean();    let count = 0;
 
 //     for (const perfume of perfumes) {
 //         count++;
@@ -508,7 +524,10 @@ const getFavorites = async (req: Request, res: Response, next: NextFunction): Pr
 //         console.log("perfumersList", perfumersList.length);
 //         const noteMap = new Map(perfumersList.map(perfumer => [perfumer.name.toLowerCase().trim(), perfumer._id]));
 
-//         const perfumes = await PerfumeModel.find({}).lean();
+//       const perfumes = await PerfumeModel.find({
+//             "perfumers.perfumerId": { $exists: false }
+//         }).lean();
+//         console.log("perfumes", perfumes.length);
 //         let count = 0;
 //         const bulkUpdates = [];
 
