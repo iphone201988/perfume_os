@@ -52,7 +52,7 @@ const perfume = async (req: Request, res: Response, next: NextFunction): Promise
         for (let perfumer of perfume.perfumers) {
             perfumer.perfumerId = await PerfumersModel.findById(perfumer.perfumerId).lean();
         }
-        perfume.perfumers =  perfume?.perfumers?.filter(p => p.perfumerId !== null);
+        perfume.perfumers = perfume?.perfumers?.filter(p => p.perfumerId !== null);
         perfume.reviews = await ReviewModel.find({ perfumeId: perfume._id }).sort({ datePublished: -1 }).limit(10).lean();
         const totalReviewsAndRatings = await ReviewModel.aggregate([
             {
@@ -301,55 +301,59 @@ const simillerPerfume = async (req: Request, res: Response, next: NextFunction):
     }
 };
 const addFavorite = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-  try {
-    const user = req.user;
-    const { id, type } = req.body;
+    try {
+        const user = req.user;
+        const { id, type } = req.body;
 
-    if (!user || !user._id) {
-      throw new BadRequestError("User not authenticated");
+        if (!user || !user._id) {
+            throw new BadRequestError("User not authenticated");
+        }
+
+        // Map type to model & field name in FavoritesModel
+        const typeMap: Record<string, { model: any; favField: string; singularName: string }> = {
+            perfume: { model: PerfumeModel, favField: "perfumeId", singularName: "Perfume" },
+            note: { model: NotesModel, favField: "noteId", singularName: "Note" },
+            perfumer: { model: PerfumersModel, favField: "perfumerId", singularName: "Perfumer" },
+        };
+
+        const typeInfo = typeMap[type];
+        if (!typeInfo) {
+            throw new BadRequestError("Invalid favorite type");
+        }
+
+        const item = await typeInfo.model.findById(id);
+        if (!item) {
+            throw new BadRequestError(`${typeInfo.singularName} does not exist`);
+        }
+
+        const favQuery = { [typeInfo.favField]: id, userId: user._id };
+        const existingFavorite = await FavoritesModel.findOne(favQuery);
+
+        if (existingFavorite) {
+            await FavoritesModel.findByIdAndDelete(existingFavorite._id);
+            const data = await getUserProfile(user._id.toString(), user)
+            emitGetProfile(user._id.toString(), data)
+            return SUCCESS(
+                res,
+                200,
+                `${typeInfo.singularName} removed from favorite successfully`,
+                {}
+            );
+        }
+
+        await FavoritesModel.create({ [typeInfo.favField]: id, userId: user._id, type });
+        const data = await getUserProfile(user._id.toString(), user)
+        emitGetProfile(user._id.toString(), data)
+        return SUCCESS(
+            res,
+            200,
+            `${typeInfo.singularName} added to favorite successfully`,
+            {}
+        );
+    } catch (error) {
+        console.error("error in addFavorite", error);
+        next(error);
     }
-
-    // Map type to model & field name in FavoritesModel
-    const typeMap: Record<string, { model: any; favField: string; singularName: string }> = {
-      perfume: { model: PerfumeModel, favField: "perfumeId", singularName: "Perfume" },
-      note: { model: NotesModel, favField: "noteId", singularName: "Note" },
-      perfumer: { model: PerfumersModel, favField: "perfumerId", singularName: "Perfumer" },
-    };
-
-    const typeInfo = typeMap[type];
-    if (!typeInfo) {
-      throw new BadRequestError("Invalid favorite type");
-    }
-
-    const item = await typeInfo.model.findById(id);
-    if (!item) {
-      throw new BadRequestError(`${typeInfo.singularName} does not exist`);
-    }
-
-    const favQuery = { [typeInfo.favField]: id, userId: user._id };
-    const existingFavorite = await FavoritesModel.findOne(favQuery);
-
-    if (existingFavorite) {
-      await FavoritesModel.findByIdAndDelete(existingFavorite._id);
-      return SUCCESS(
-        res,
-        200,
-        `${typeInfo.singularName} removed from favorite successfully`,
-        {}
-      );
-    }
-
-    await FavoritesModel.create({ [typeInfo.favField]: id, userId: user._id, type });
-    return SUCCESS(
-      res,
-      200,
-      `${typeInfo.singularName} added to favorite successfully`,
-      {}
-    );
-  } catch (error) {
-    console.error("error in addFavorite", error);
-    next(error);
-  }
 };
 const getFavorites = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -388,10 +392,24 @@ const getFavorites = async (req: Request, res: Response, next: NextFunction): Pr
                         },
                         {
                             $lookup: {
+                                from: 'Articles',
+                                localField: 'articleId',
+                                foreignField: '_id',
+                                as: 'articleId'
+                            }
+                        },
+                        {
+                            $lookup: {
                                 from: 'Perfumers',
                                 localField: 'perfumerId',
                                 foreignField: '_id',
                                 as: 'perfumerId'
+                            }
+                        },
+                        {
+                            $unwind: {
+                                path: '$articleId',
+                                preserveNullAndEmptyArrays: true
                             }
                         },
                         {
@@ -618,7 +636,7 @@ function generateRandom2to5() {
 
 
 async function changeInReview() {
-    const Reviews = await ReviewModel.find({$or:[{rating:1},{rating:2}]}).lean();
+    const Reviews = await ReviewModel.find({ $or: [{ rating: 1 }, { rating: 2 }] }).lean();
     let count = 0;
     const bulkUpdates = [];
 
