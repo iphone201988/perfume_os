@@ -24,8 +24,8 @@ const perfume = async (req: Request, res: Response, next: NextFunction): Promise
         let query: Record<string, any> = {};
 
         // Build the query with escaped regex if necessary
-        if (typeof name === 'string') query['name'] = new RegExp(escapeRegex(name), 'i');
-        if (typeof brand === 'string') query['brand'] = new RegExp(escapeRegex(brand), 'i');
+        if (typeof name === 'string')   query['name'] = new RegExp('^' + escapeRegex(name), 'i'); 
+        if (typeof brand === 'string') query['brand'] = new RegExp('^' + escapeRegex(brand), 'i');
         if (typeof perfumeId === 'string') query['_id'] = perfumeId;
 
         // Fetch the perfume and reviews in a single query (including notes data)
