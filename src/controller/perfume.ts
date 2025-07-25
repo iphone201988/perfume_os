@@ -114,7 +114,7 @@ const searchPerfume = async (req: Request, res: Response, next: NextFunction): P
         const currentPage = Math.max(Number(page), 1);
         const perPage = Math.max(Number(limit), 1);
         const skip = (currentPage - 1) * perPage;
-        const query = { $or: [{ name: { $regex: search, $options: 'i' } }, { brand: { $regex: search, $options: 'i' } }] };
+        const query = {  name: { $regex: "^" + search, $options: 'i' } } ;
         const perfumes = await PerfumeModel.find(query).select('name brand image').sort({ name: 1 }).skip(skip)
             .limit(perPage).lean();
         const totalCount = await PerfumeModel.countDocuments(query);
