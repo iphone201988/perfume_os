@@ -368,7 +368,8 @@ export const updateUserData = async (req: Request, res: Response, next: NextFunc
         }
         Object.assign(user, updateData);
         await user.save();
-        SUCCESS(res, 200, "Update Successfully");
+        const data = publicViewData(user)
+        SUCCESS(res, 200, "Update Successfully",{data});
     } catch (error) {
         console.log("error in register", error);
         next(error);
