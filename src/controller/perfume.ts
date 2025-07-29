@@ -13,6 +13,7 @@ import FavoritesModel from "../model/Favorites";
 import { getUserProfile } from "./user";
 import { emitGetProfile } from "../services/socketManager";
 import ArticlesModel from "../model/Articles";
+import mongoose from "mongoose";
 
 
 
@@ -24,7 +25,7 @@ const perfume = async (req: Request, res: Response, next: NextFunction): Promise
         let query: Record<string, any> = {};
 
         // Build the query with escaped regex if necessary
-        if (typeof name === 'string')   query['name'] = new RegExp('^' + escapeRegex(name), 'i'); 
+        if (typeof name === 'string') query['name'] = new RegExp('^' + escapeRegex(name), 'i');
         if (typeof brand === 'string') query['brand'] = new RegExp('^' + escapeRegex(brand), 'i');
         if (typeof perfumeId === 'string') query['_id'] = perfumeId;
 
@@ -34,7 +35,11 @@ const perfume = async (req: Request, res: Response, next: NextFunction): Promise
         if (!perfume) {
             return res.status(200).json({ success: false, message: "Perfume not found in database" });
         }
-
+        const favorites = await FavoritesModel.find({ userId: req.userId }).lean();
+        const favoriteNoteIds = favorites.map((fav: any) => fav?.noteId?.toString());
+        const favoritePerfumerIds = favorites.map((fav: any) => fav?.perfumerId?.toString());
+        const favoritePerfumeIds = favorites.map((fav: any) => fav?.perfumeId?.toString());
+        perfume.isFavorite = favoritePerfumeIds.includes(perfume._id.toString())
         // Populate note information by fetching all notes at once
         const noteGroups = ['base', 'top', 'middle', 'notes'];
         for (const group of noteGroups) {
@@ -44,16 +49,18 @@ const perfume = async (req: Request, res: Response, next: NextFunction): Promise
                     const notes = await NotesModel.find({ '_id': { $in: noteIds } }).lean();
                     perfume.notes[group] = perfume.notes[group].map((item: any) => ({
                         ...item,
-                        noteId: notes.find((note: any) => note._id.toString() === item?.noteId?.toString()) || item.noteId
+                        noteId: notes.find((note: any) => note._id.toString() === item?.noteId?.toString()) || item.noteId,
+                        isFavorite: favoriteNoteIds.includes(item?.noteId?.toString())
                     }));
                 }
             }
         }
         //perfumers
+        perfume.perfumers = perfume?.perfumers?.filter(p => p.perfumerId !== null);
         for (let perfumer of perfume.perfumers) {
+            perfumer.isFavorite = favoritePerfumerIds.includes(perfumer?.perfumeId?.toString())
             perfumer.perfumerId = await PerfumersModel.findById(perfumer.perfumerId).lean();
         }
-        perfume.perfumers = perfume?.perfumers?.filter(p => p.perfumerId !== null);
         perfume.reviews = await ReviewModel.find({ perfumeId: perfume._id }).sort({ datePublished: -1 }).limit(10).lean();
         const totalReviewsAndRatings = await ReviewModel.aggregate([
             {
@@ -114,7 +121,7 @@ const searchPerfume = async (req: Request, res: Response, next: NextFunction): P
         const currentPage = Math.max(Number(page), 1);
         const perPage = Math.max(Number(limit), 1);
         const skip = (currentPage - 1) * perPage;
-        const query = {  name: { $regex: "^" + search, $options: 'i' } } ;
+        const query = { name: { $regex: "^" + search, $options: 'i' } };
         const perfumes = await PerfumeModel.find(query).select('name brand image').sort({ name: 1 }).skip(skip)
             .limit(perPage).lean();
         const totalCount = await PerfumeModel.countDocuments(query);
@@ -217,7 +224,7 @@ const getPerfumeReviews = async (req: Request, res: Response, next: NextFunction
 const getNotes = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         const { id } = req.query;
-        const note = await NotesModel.findById(id).lean();
+        const note: any = await NotesModel.findById(id).lean();
         if (!note) {
             throw new BadRequestError("Note not found");
         }
@@ -233,6 +240,9 @@ const getNotes = async (req: Request, res: Response, next: NextFunction): Promis
             .select('name brand image')
             .lean();
 
+        note.isFavorite = (await FavoritesModel.findOne({ userId: req.userId, noteId: note._id })) ? true : false;
+
+
         SUCCESS(res, 200, "Notes fetched successfully", { data: { note, perfumes } });
     } catch (error) {
         next(error);
@@ -242,7 +252,7 @@ const getNotes = async (req: Request, res: Response, next: NextFunction): Promis
 const getPerfumer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         const { id } = req.query;
-        const perfumer = await PerfumersModel.findById(id).lean();
+        const perfumer: any = await PerfumersModel.findById(id).lean();
         if (!perfumer) {
             throw new BadRequestError("Perfumer not found");
         }
@@ -251,6 +261,7 @@ const getPerfumer = async (req: Request, res: Response, next: NextFunction): Pro
             .select('name brand image')  // Selecting relevant fields
             .limit(10)
             .lean();
+        perfumer.isFavorite = (await FavoritesModel.findOne({ userId: req.userId, perfumerId: perfumer._id })) ? true : false;
         const totalCount = await PerfumeModel.countDocuments({ "perfumers.perfumerId": id });
         SUCCESS(res, 200, "Perfumer fetched successfully", { data: { perfumer, perfumes, totalCount } });
     } catch (error) {
@@ -381,7 +392,14 @@ const getFavorites = async (req: Request, res: Response, next: NextFunction): Pr
                                 from: 'Perfume',
                                 localField: 'perfumeId',
                                 foreignField: '_id',
-                                as: 'perfumeId'
+                                as: 'perfumeId',
+                                pipeline: [
+                                    {
+                                        $project: {
+                                            "name": 1, "brand": 1, "image": 1
+                                        }
+                                    }
+                                ]
                             }
                         },
                         {
@@ -389,7 +407,14 @@ const getFavorites = async (req: Request, res: Response, next: NextFunction): Pr
                                 from: 'Notes',
                                 localField: 'noteId',
                                 foreignField: '_id',
-                                as: 'noteId'
+                                as: 'noteId',
+                                pipeline: [
+                                    {
+                                        $project: {
+                                            "name": 1, "image": 1
+                                        }
+                                    }
+                                ]
                             }
                         },
                         {
@@ -397,7 +422,14 @@ const getFavorites = async (req: Request, res: Response, next: NextFunction): Pr
                                 from: 'Articles',
                                 localField: 'articleId',
                                 foreignField: '_id',
-                                as: 'articleId'
+                                as: 'articleId',
+                                pipeline: [
+                                    {
+                                        $project: {
+                                            "title": 1, "image": 1
+                                        }
+                                    }
+                                ]
                             }
                         },
                         {
@@ -405,7 +437,14 @@ const getFavorites = async (req: Request, res: Response, next: NextFunction): Pr
                                 from: 'Perfumers',
                                 localField: 'perfumerId',
                                 foreignField: '_id',
-                                as: 'perfumerId'
+                                as: 'perfumerId',
+                                pipeline: [
+                                    {
+                                        $project: {
+                                            "name": 1, "image": 1
+                                        }
+                                    }
+                                ]
                             }
                         },
                         {
@@ -671,4 +710,38 @@ async function changeInReview() {
 
 // changeInReview();
 
+// add noteid which not have 
+async function addNotesToPerfume(name: string, noteId: string) {
+    if(!name || !noteId) return;
+   const perfumes = await PerfumeModel.find({
+    $or: [
+        { "notes.top":    { $elemMatch: { name: name, noteId: { $exists: false } } } },
+        { "notes.middle": { $elemMatch: { name: name, noteId: { $exists: false } } } },
+        { "notes.base":   { $elemMatch: { name: name, noteId: { $exists: false } } } },
+        { "notes.notes":  { $elemMatch: { name: name, noteId: { $exists: false } } } }
+    ]
+}).lean();
+    const noteSections = ['top', 'middle', 'base', 'notes'];
+    let count = 0;
+
+    for (const perfume of perfumes) {
+        count++;
+        console.log(perfume?.name, "COUNT", count);
+
+        for (const section of noteSections) {
+            if (perfume.notes[section]) {
+                for (const note of perfume.notes[section]) {
+                    if (note.name.toString().trim() === name.toString().trim() && !note.noteId) {
+                        note.noteId = new mongoose.Types.ObjectId(noteId);
+                    }
+                }
+            }
+        }
+
+        await PerfumeModel.updateOne({ _id: perfume._id }, { $set: { notes: perfume.notes } });
+        console.log("perfume", perfume?.name);
+    }
+}
+
+// addNotesToPerfume("Green Leaves","6839edacc412f47360596aa2")
 export default { perfume, recentAndTopSearches, searchPerfume, writeReview, getPerfumeReviews, getNotes, getPerfumer, simillerPerfume, addFavorite, getFavorites };
