@@ -286,7 +286,13 @@ const simillerPerfume = async (req: Request, res: Response, next: NextFunction):
                 .skip(skip)
                 .limit(10)
                 .lean();
-            SUCCESS(res, 200, "Similler Perfumes fetched successfully", { data: perfumes });
+            const totalCount = await PerfumeModel.countDocuments({"perfumers.perfumerId": perfumer._id});
+            const pagination = {
+                totalCount,
+                currentPage,
+                perPage
+            };
+            SUCCESS(res, 200, "Similler Perfumes fetched successfully", { data: perfumes, pagination });
         } else if (type === "note") {
             const note = await NotesModel.findById(id).lean();
             if (!note) {
@@ -304,7 +310,20 @@ const simillerPerfume = async (req: Request, res: Response, next: NextFunction):
                 .limit(10)
                 .select('name brand image')
                 .lean();
-            SUCCESS(res, 200, "Similler Perfumes fetched successfully", { data: perfumes });
+            const totalCount = await PerfumeModel.countDocuments({
+                $or: [
+                    { "notes.top.noteId": note._id },
+                    { "notes.middle.noteId": note._id },
+                    { "notes.base.noteId": note._id },
+                    { "notes.notes.noteId": note._id }
+                ]
+            });
+            const pagination = {
+                totalCount,
+                currentPage,
+                perPage
+            };
+            SUCCESS(res, 200, "Similler Perfumes fetched successfully", { data: perfumes,pagination });
         } else {
             throw new BadRequestError("Type not found");
         }
@@ -742,6 +761,6 @@ async function addNotesToPerfume(name: string, noteId: string) {
         console.log("perfume", perfume?.name);
     }
 }
-
 // addNotesToPerfume("Green Leaves","6839edacc412f47360596aa2")
+
 export default { perfume, recentAndTopSearches, searchPerfume, writeReview, getPerfumeReviews, getNotes, getPerfumer, simillerPerfume, addFavorite, getFavorites };
