@@ -200,7 +200,7 @@ const profile = async (req: Request, res: Response, next: NextFunction): Promise
                     }
                 }
             ]),
-            FavoritesModel.find({ userId: viewedUser._id}).populate("perfumeId", "name brand image").populate("perfumerId", "name smallImage").populate("noteId", "name bgurl").populate("articleId", "title image").limit(12).lean(),
+            FavoritesModel.find({ userId: viewedUser._id}).populate("perfumeId", "name brand image").populate("perfumerId", "name smallImage").populate("noteId", "name bgUrl").populate("articleId", "title image").limit(12).lean(),
             FavoritesModel.countDocuments({ userId: viewedUser._id })
         ]);
         const { reviews = [], totalReviews = 0, averageRating = 0 } = reviewDataAgg[0] || {}
@@ -313,7 +313,7 @@ export const getUserProfile = async (userId: string, currentUser: IUser | null):
                     }
                 }
             ]),
-            FavoritesModel.find({ userId: viewedUser._id}).populate("perfumeId", "name brand image").populate("perfumerId", "name smallImage").populate("noteId", "name bgurl").populate("articleId", "title image").limit(12).lean(),
+            FavoritesModel.find({ userId: viewedUser._id}).populate("perfumeId", "name brand image").populate("perfumerId", "name smallImage").populate("noteId", "name bgUrl").populate("articleId", "title image").limit(12).lean(),
             FavoritesModel.countDocuments({ userId: viewedUser._id })
         ]);
 

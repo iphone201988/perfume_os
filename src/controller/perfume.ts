@@ -430,7 +430,7 @@ const getFavorites = async (req: Request, res: Response, next: NextFunction): Pr
                                 pipeline: [
                                     {
                                         $project: {
-                                            "name": 1, "bgurl": 1
+                                            "name": 1, "bgUrl": 1
                                         }
                                     }
                                 ]
