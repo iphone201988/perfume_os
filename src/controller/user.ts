@@ -67,6 +67,7 @@ const register = async (req: Request, res: Response, next: NextFunction): Promis
         if (checkUsername) {
             throw new BadRequestError("User with this username already exists");
         }
+        req.body.email =  req.body?.email?.toLowerCase();
         const checkEmail = await findUserByEmail(req?.body?.email);
         if (checkEmail) {
             throw new BadRequestError("User with this email already exists");
@@ -199,7 +200,7 @@ const profile = async (req: Request, res: Response, next: NextFunction): Promise
                     }
                 }
             ]),
-            FavoritesModel.find({ userId: viewedUser._id}).populate("perfumeId", "name brand image").populate("perfumerId", "name smallImage").populate("noteId", "name image").populate("articleId", "title image").limit(12).lean(),
+            FavoritesModel.find({ userId: viewedUser._id}).populate("perfumeId", "name brand image").populate("perfumerId", "name smallImage").populate("noteId", "name bgurl").populate("articleId", "title image").limit(12).lean(),
             FavoritesModel.countDocuments({ userId: viewedUser._id })
         ]);
         const { reviews = [], totalReviews = 0, averageRating = 0 } = reviewDataAgg[0] || {}
@@ -312,7 +313,7 @@ export const getUserProfile = async (userId: string, currentUser: IUser | null):
                     }
                 }
             ]),
-            FavoritesModel.find({ userId: viewedUser._id}).populate("perfumeId", "name brand image").populate("perfumerId", "name smallImage").populate("noteId", "name image").populate("articleId", "title image").limit(12).lean(),
+            FavoritesModel.find({ userId: viewedUser._id}).populate("perfumeId", "name brand image").populate("perfumerId", "name smallImage").populate("noteId", "name bgurl").populate("articleId", "title image").limit(12).lean(),
             FavoritesModel.countDocuments({ userId: viewedUser._id })
         ]);
 
@@ -421,6 +422,7 @@ const forgetPassword = async (req: Request, res: Response, next: NextFunction): 
         if (!req.body.email || !req.body.type) {
             throw new BadRequestError("Email and type is required");
         }
+        req.body.email =  req.body?.email?.toLowerCase();
         const user = await findUserByEmail(req.body.email);
         if (!user) {
             throw new BadRequestError("User does not exist");
@@ -500,6 +502,7 @@ const deleteUser = async (req: Request, res: Response, next: NextFunction): Prom
             throw new BadRequestError("Invalid password");
         }
         await UserModel.findByIdAndDelete(user._id);
+        await FavoritesModel.findOneAndDelete({userId:user._id})
         SUCCESS(res, 200, "User deleted successfully");
     } catch (error) {
         console.log("error in deleteUser", error);
