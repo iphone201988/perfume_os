@@ -298,6 +298,38 @@ const submitQuizValidation = {
       "any.required": "Answers are required",
     }),
   }),
+};
+const notificationValidation = {
+  query: Joi.object({
+    page: Joi.string().pattern(/^[0-9]+$/).optional().messages({
+      "string.base": "Page must be a string",
+      "string.pattern.base": "Page must be a number",
+    }),
+    limit: Joi.string().pattern(/^[0-9]+$/).optional().messages({
+      "string.base": "Limit must be a string",
+      "string.pattern.base": "Limit must be a number",
+    }),
+    status: Joi.string().required().valid("all", "unread").messages({
+      "string.base": "Status must be a string",
+    })
+  }),
+};
+const markNotificationAsReadValidation = {
+  query: Joi.object({
+    type: Joi.string().valid("all", "single").required().messages({
+      "string.base": "Type must be a string",
+      "any.required": "Type is required",
+      "any.only": "Invalid type",
+    }),
+    id: Joi.when('type', {
+      is: 'single',
+      then: Joi.string().required().messages({
+        "string.base": "ID must be a string",
+        "any.required": "ID is required when type is 'single'",
+      }),
+      otherwise: Joi.forbidden()
+    }),
+  }),
 }
 export default {
   socialLoginValidation,
@@ -312,5 +344,6 @@ export default {
   collectionValidation,
   deleteValidation,
   userDataValidation,
-  favoriteValidation, getFavoriteValidation,submitQuizValidation  
+  favoriteValidation, getFavoriteValidation,submitQuizValidation,
+  notificationValidation, markNotificationAsReadValidation  
 };

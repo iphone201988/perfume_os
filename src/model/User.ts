@@ -4,7 +4,7 @@ import { IUser } from "../types/database/type";
 const UserSchema = new mongoose.Schema<IUser>({
     fullname: { type: String, default: null },
     username: { type: String, default: null },
-    email: { type: String, required: true, unique: true },
+    email: { type: String, default: null},
     password: { type: String, },
     profileImage: { type: String, default: null },
     timezone: { type: String, default: null },

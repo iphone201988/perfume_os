@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { comparePassword, findPerfumeById, findUserByEmail, findUserById, findUserByReferral, findUserBySocialId, findUserByUsername, generateOtp, /* getRankName, */ hashPassword, otpExpiry, publicViewData, signToken, } from "../utils/utills";
+import { comparePassword, findPerfumeById, findUserByEmail, findUserById, findUserByReferral, findUserBySocialId, findUserByUsername, generateOtp, getRankName, hashPassword, otpExpiry, publicViewData, signToken, } from "../utils/utills";
 import UserModel from "../model/User";
 import PerfumeModel from "../model/Perfume";
 import { SUCCESS } from "../utils/response";
@@ -13,12 +13,13 @@ import { IUser } from "../types/database/type";
 import BadgesModel from "../model/Badges";
 import UserBadgesModel from "../model/UserBadges";
 import { emitGetProfile } from "../services/socketManager";
-// import QuestionModel from "../model/QuestionModel";
-// import QuizModel from "../model/QuizModel";
+import QuestionModel from "../model/QuestionModel";
+import QuizModel from "../model/QuizModel";
 import mongoose from "mongoose";
 import FavoritesModel from "../model/Favorites";
 import PerfumersModel from "../model/Perfumers";
 import NotesModel from "../model/Notes";
+import NotificationsModel from "../model/Notification";
 //social login
 const socialLogin = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
@@ -67,7 +68,7 @@ const register = async (req: Request, res: Response, next: NextFunction): Promis
         if (checkUsername) {
             throw new BadRequestError("User with this username already exists");
         }
-        req.body.email =  req.body?.email?.toLowerCase();
+        req.body.email = req.body?.email?.toLowerCase();
         const checkEmail = await findUserByEmail(req?.body?.email);
         if (checkEmail) {
             throw new BadRequestError("User with this email already exists");
@@ -200,7 +201,7 @@ const profile = async (req: Request, res: Response, next: NextFunction): Promise
                     }
                 }
             ]),
-            FavoritesModel.find({ userId: viewedUser._id}).populate("perfumeId", "name brand image").populate("perfumerId", "name smallImage").populate("noteId", "name bgUrl").populate("articleId", "title image").limit(12).lean(),
+            FavoritesModel.find({ userId: viewedUser._id }).populate("perfumeId", "name brand image").populate("perfumerId", "name smallImage").populate("noteId", "name bgUrl").populate("articleId", "title image").limit(12).lean(),
             FavoritesModel.countDocuments({ userId: viewedUser._id })
         ]);
         const { reviews = [], totalReviews = 0, averageRating = 0 } = reviewDataAgg[0] || {}
@@ -313,7 +314,7 @@ export const getUserProfile = async (userId: string, currentUser: IUser | null):
                     }
                 }
             ]),
-            FavoritesModel.find({ userId: viewedUser._id}).populate("perfumeId", "name brand image").populate("perfumerId", "name smallImage").populate("noteId", "name bgUrl").populate("articleId", "title image").limit(12).lean(),
+            FavoritesModel.find({ userId: viewedUser._id }).populate("perfumeId", "name brand image").populate("perfumerId", "name smallImage").populate("noteId", "name bgUrl").populate("articleId", "title image").limit(12).lean(),
             FavoritesModel.countDocuments({ userId: viewedUser._id })
         ]);
 
@@ -370,7 +371,7 @@ export const updateUserData = async (req: Request, res: Response, next: NextFunc
         Object.assign(user, updateData);
         await user.save();
         const data = publicViewData(user)
-        SUCCESS(res, 200, "Update Successfully",{data});
+        SUCCESS(res, 200, "Update Successfully", { data });
     } catch (error) {
         console.log("error in register", error);
         next(error);
@@ -422,7 +423,7 @@ const forgetPassword = async (req: Request, res: Response, next: NextFunction): 
         if (!req.body.email || !req.body.type) {
             throw new BadRequestError("Email and type is required");
         }
-        req.body.email =  req.body?.email?.toLowerCase();
+        req.body.email = req.body?.email?.toLowerCase();
         const user = await findUserByEmail(req.body.email);
         if (!user) {
             throw new BadRequestError("User does not exist");
@@ -502,7 +503,7 @@ const deleteUser = async (req: Request, res: Response, next: NextFunction): Prom
             throw new BadRequestError("Invalid password");
         }
         await UserModel.findByIdAndDelete(user._id);
-        await FavoritesModel.findOneAndDelete({userId:user._id})
+        await FavoritesModel.findOneAndDelete({ userId: user._id })
         SUCCESS(res, 200, "User deleted successfully");
     } catch (error) {
         console.log("error in deleteUser", error);
@@ -523,7 +524,15 @@ const followUser = async (req: Request, res: Response, next: NextFunction): Prom
             await FollowModel.findByIdAndDelete(isFollowing._id);
         } else {
             console.log("isFollowing", followingUser);
-            await FollowModel.create({ userId: user._id, followId: followingUser._id });
+            const follow = await FollowModel.create({ userId: user._id, followId: followingUser._id });
+            await NotificationsModel.create(
+                {
+                    userId,
+                    followId: follow._id,
+                    type: "follow",
+                    message: `${user.fullname} is followed you`,
+                    title: `${user.fullname} is followed you`
+                });
         }
         const data = await getUserProfile(user._id.toString(), user)
         emitGetProfile(user._id.toString(), data)
@@ -649,79 +658,170 @@ const userData = async (req: Request, res: Response, next: NextFunction): Promis
         next(error);
     }
 }
-// const submitUserQuiz = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-//     try {
-//         const user = req.user;
-//         const { type, mode, answers } = req.body;
+const submitUserQuiz = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const user = req.user;
+        const { type, mode, answers } = req.body;
 
-//         const totalQuestions = answers.length;
-//         let correctAnswers = 0;
-//         const formattedQuestions = [];
+        const totalQuestions = answers.length;
+        let correctAnswers = 0;
+        const formattedQuestions = [];
 
-//         for (const ans of answers) {
-//             const question = await QuestionModel.findById(ans.questionId);
-//             if (!question) continue;
-//             const isCorrect = ans.selectedAnswer?.toLowerCase() === question.correctAnswer?.toLowerCase();
-//             if (isCorrect) correctAnswers++;
+        for (const ans of answers) {
+            const question = await QuestionModel.findById(ans.questionId);
+            if (!question) continue;
+            const isCorrect = ans.selectedAnswer?.toLowerCase() === question.correctAnswer?.toLowerCase();
+            if (isCorrect) correctAnswers++;
 
-//             formattedQuestions.push({
-//                 questionId: ans.questionId,
-//                 correctAnswer: question.correctAnswer,
-//                 selectedAnswer: ans.selectedAnswer,
-//                 isCorrect,
-//             });
-//         }
+            formattedQuestions.push({
+                questionId: ans.questionId,
+                correctAnswer: question.correctAnswer,
+                selectedAnswer: ans.selectedAnswer,
+                isCorrect,
+            });
+        }
 
-//         const passed = correctAnswers >= 7;
-//         let pointsEarned = 0;
+        const passed = correctAnswers >= 7;
+        let pointsEarned = 0;
 
-//         if (mode === "quick") pointsEarned = passed ? 20 : 0;
-//         if (mode === "ranked") pointsEarned = passed ? 100 : -50;
+        if (mode === "quick") pointsEarned = passed ? 20 : 0;
+        if (mode === "ranked") pointsEarned = passed ? 100 : -50;
 
-//         const previousPoints = user?.rankPoints || 0;
-//         const newPoints = Math.max(0, previousPoints + pointsEarned);
-//         const rankName = getRankName(newPoints);
+        const previousPoints = user?.rankPoints || 0;
+        const newPoints = Math.max(0, previousPoints + pointsEarned);
+        const rankName = getRankName(newPoints);
 
-//         await QuizModel.create({
-//             userId: user._id,
-//             type,
-//             mode,
-//             questions: formattedQuestions,
-//             totalQuestions,
-//             correctAnswers,
-//             score: correctAnswers * 10,
-//             status: passed ? "pass" : "fail",
-//             pointsEarned,
-//         });
+        await QuizModel.create({
+            userId: user._id,
+            type,
+            mode,
+            questions: formattedQuestions,
+            totalQuestions,
+            correctAnswers,
+            score: correctAnswers * 10,
+            status: passed ? "pass" : "fail",
+            pointsEarned,
+        });
 
-//         await UserModel.findByIdAndUpdate(user._id, { rankPoints: newPoints, rankName });
-//         SUCCESS(res, 200, "Quiz submitted successfully", {});
-//     }
-//     catch (error) {
-//         console.log("error in userData", error);
-//         next(error);
-//     }
-// };
-// const getQuestions = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-//     try {
-//         const userId = req.userId;
-//         const userQuizRecords = await QuizModel.find({ userId }).select("questions.questionId").lean();
-//         const attemptedQuestionIds = userQuizRecords
-//             .flatMap(record => record.questions.map(q => q.questionId?.toString()))
-//             .filter(Boolean);
-//         const questions = await QuestionModel.aggregate([
-//             { $match: { _id: { $nin: attemptedQuestionIds.map(id => new mongoose.Types.ObjectId(id)) }, isDeleted: false } },
-//             { $sample: { size: 10 } },
-//         ]);
-//         if (questions?.length <= 10) throw new BadRequestError("No more questions available");
-//         SUCCESS(res, 200, "Question fetched successfully", { data: questions });
-//     } catch (error) {
-//         next(error);
-//     }
-// };
+        await UserModel.findByIdAndUpdate(user._id, { rankPoints: newPoints, rankName });
+        SUCCESS(res, 200, "Quiz submitted successfully", {});
+    }
+    catch (error) {
+        console.log("error in userData", error);
+        next(error);
+    }
+};
+const getQuestions = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const userId = req.userId;
+        const userQuizRecords = await QuizModel.find({ userId }).select("questions.questionId").lean();
+        const attemptedQuestionIds = userQuizRecords
+            .flatMap(record => record.questions.map(q => q.questionId?.toString()))
+            .filter(Boolean);
+        const questions = await QuestionModel.aggregate([
+            { $match: { _id: { $nin: attemptedQuestionIds.map(id => new mongoose.Types.ObjectId(id)) }, isDeleted: false } },
+            { $sample: { size: 10 } },
+        ]);
+        if (questions?.length <= 10) throw new BadRequestError("No more questions available");
+        SUCCESS(res, 200, "Question fetched successfully", { data: questions });
+    } catch (error) {
+        next(error);
+    }
+};
+const getNotifications = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const user = req.user;
+        const { page = "1", limit = "10", status } = req.query;
+        const currentPage = Number(page) || 1;
+        const perPage = Number(limit) || 10;
+        const skip = (currentPage - 1) * perPage;
+
+        const filter = {
+            userId: user._id,
+        };
+
+        if (status === "unread") filter["isRead"] = false ;
+
+        const results = await NotificationsModel.aggregate([
+            { $match: filter },
+            { $sort: { createdAt: -1 } },
+            {$facet:{
+                notifications: [
+                    { $skip: skip },
+                    { $limit: perPage },
+                    {
+                        $lookup: {
+                            from: "Follow",
+                            localField: "followId",
+                            foreignField: "_id",
+                            as: "follow",
+                            pipeline: [
+                                {
+                                    $lookup: {
+                                        from: "User",
+                                        localField: "followId",
+                                        foreignField: "_id",
+                                        as: "followUser",
+                                        pipeline: [
+                                            {
+                                                $project: {
+                                                    _id: 1,
+                                                    fullname: 1,
+                                                    profileImage: 1,
+                                                },
+                                            },
+                                        ],
+        
+                                    },
+                                },
+                                {
+                                    $unwind: {
+                                        path: "$followUser",
+                                        preserveNullAndEmptyArrays: true
+                                    },
+                                },
+                            ],
+                        }
+                    },
+                    {
+                        $unwind: {
+                            path: "$follow",
+                            preserveNullAndEmptyArrays: true
+                        },
+                    }
+                
+            ],
+                totalNotifications: [
+                    { $count: "count" },
+                ],
+            }}
+        ]);
+
+        const totalCount = results[0]?.totalNotifications[0]?.count || 0;
+        const notifications = results[0]?.notifications || [];
+        const pagination = { totalCount, currentPage, perPage, totalPage: Math.ceil(totalCount / perPage) };
+        SUCCESS(res, 200, "Notifications fetched successfully", { data: notifications, pagination });
+    } catch (error) {
+        next(error);
+    }
+};
+const markNotificationAsRead = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const user = req.user;
+        const { type, id} = req.query;
+        if(type == "single"){
+            await NotificationsModel.findByIdAndUpdate( id , {  isRead: true  });
+        }
+        await NotificationsModel.updateMany({ userId: user._id }, { $set: { isRead: true } });
+        SUCCESS(res, 200, "Notifications marked as read successfully", {});
+    } catch (error) {
+        next(error);
+    }
+};
 
 export default {
     register, login, profile, updateUserData, uploadImage,
     forgetPassword, verifyOtp, resetPassword, profileUpdate, socialLogin, deleteUser,
-    followUser, addCollection, addWishlist, userData, /* submitUserQuiz, getQuestions,  */
+    followUser, addCollection, addWishlist, userData, submitUserQuiz, getQuestions,
+    getNotifications, markNotificationAsRead
 };

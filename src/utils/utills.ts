@@ -28,18 +28,18 @@ export const findUserByEmail = async (email: string) => await UserModel.findOne(
 export const findUserByUsername = async (username: string) => await UserModel.findOne({ username });
 export const findUserById = async (id: string) => await UserModel.findById(id);
 export const findPerfumeById = async (id: string) => await PerfumeModel.findById(id);
-export const publicViewData = (user: IUser) => {
+export const publicViewData = (user: any) => {
   return {
-    _id: user._id, username: user.username, fullname: user.fullname, email: user.email, profileImage: user.profileImage, timezone: user.timezone, gender: user.gender, language: user.language, step: user.step, isNotificationOn: user.isNotificationOn, dob: user.dob, socialLinkedAccounts: user.socialLinkedAccounts, isVerified: user.isVerified, isBlocked: user.isBlocked, isDeleted: user.isDeleted,
-    perfumeStrength: user.perfumeStrength,
-    perfumeBudget: user.perfumeBudget,
-    enjoySmell: user.enjoySmell,
-    reasonForWearPerfume: user.reasonForWearPerfume,
-    referralSource: user.referralSource,
-    referralCode: user.referralCode,
-    rankPoints: user.rankPoints,
-    tutorialProgess: user.tutorialProgess,
-    theme: user.theme
+    _id: user._id, username: user?.username, fullname: user?.fullname, email: user?.email, profileImage: user?.profileImage, timezone: user?.timezone, gender: user?.gender, language: user?.language, step: user?.step, isNotificationOn: user?.isNotificationOn, dob: user?.dob, socialLinkedAccounts: user?.socialLinkedAccounts, isVerified: user?.isVerified, isBlocked: user?.isBlocked, isDeleted: user?.isDeleted,
+    perfumeStrength: user?.perfumeStrength,
+    perfumeBudget: user?.perfumeBudget,
+    enjoySmell: user?.enjoySmell,
+    reasonForWearPerfume: user?.reasonForWearPerfume,
+    referralSource: user?.referralSource,
+    referralCode: user?.referralCode,
+    rankPoints: user?.rankPoints,
+    tutorialProgess: user?.tutorialProgess,
+    theme: user?.theme
 
   }
 };
@@ -58,4 +58,10 @@ export const generateOtp = (number: number = 4, upperCaseAlphabets: boolean = fa
 export const otpExpiry = (time: number = 10) => new Date(Date.now() + time * 60 * 1000);
 
 export const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
+export function getRankName(points: number): string {
+  if (points >= 1200) return "Master Perfumer";
+  if (points >= 700) return "Fragrance Sage";
+  if (points >= 300) return "Aroma Adept";
+  if (points >= 100) return "Perfume Acolyte";
+  return "Apprentice Nose";
+}

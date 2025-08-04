@@ -4,7 +4,7 @@ import { IUser } from "./database/type";
 declare module "express-serve-static-core" {
   interface Request {
     user?: IUser;
-    userId?: ObjectId
+    userId?: ObjectId;
   }
 }
 
