@@ -522,6 +522,7 @@ const followUser = async (req: Request, res: Response, next: NextFunction): Prom
         const isFollowing = await FollowModel.findOne({ userId: user._id, followId: followingUser._id });
         if (isFollowing) {
             await FollowModel.findByIdAndDelete(isFollowing._id);
+            await NotificationsModel.findOneAndDelete({ followId: isFollowing._id });
         } else {
             console.log("isFollowing", followingUser);
             const follow = await FollowModel.create({ userId: user._id, followId: followingUser._id });
@@ -530,8 +531,8 @@ const followUser = async (req: Request, res: Response, next: NextFunction): Prom
                     userId,
                     followId: follow._id,
                     type: "follow",
-                    message: `${user.fullname} is followed you`,
-                    title: `${user.fullname} is followed you`
+                    message: `New Follower`,
+                    title: `${user.fullname} is Following  you`
                 });
         }
         const data = await getUserProfile(user._id.toString(), user)

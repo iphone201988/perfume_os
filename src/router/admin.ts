@@ -11,8 +11,14 @@ adminRouter.post("/login",validate(adminValidation.loginValidation), adminContro
 adminRouter.get("/me",authAdminMiddleware, adminController.getProfile);
 adminRouter.get("/dashboard",authAdminMiddleware, adminController.dashboard);
 adminRouter.get("/users",authAdminMiddleware, adminController.getUsers);
+adminRouter.get("/user/:userId",authAdminMiddleware, adminController.getUserById);
 adminRouter.post("/addQuestion", authAdminMiddleware,upload.single("file"),validate(adminValidation.createQuestionValidation), adminController.createQuestion);
 adminRouter.get("/questions", authAdminMiddleware, adminController.getQuestions);
 adminRouter.put("/question/:id", authAdminMiddleware, upload.single("file"),validate(adminValidation.updateQuestionValidation), adminController.updateQuestion);
 adminRouter.delete("/question/:id", authMiddleware,validate(adminValidation.deleteQuestionValidation), adminController.deleteQuestion);
+
+adminRouter.get("/articles", authAdminMiddleware, adminController.getArticles);
+adminRouter.post("/addArticle",authAdminMiddleware,upload.single("file"), adminController.createArticle);
+adminRouter.put("/article/:articleId", authAdminMiddleware,upload.single("file"), adminController.updateArticle);
+adminRouter.delete("/article/:articleId", authAdminMiddleware, adminController.deleteArticle);
 export default adminRouter
