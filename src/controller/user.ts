@@ -531,8 +531,8 @@ const followUser = async (req: Request, res: Response, next: NextFunction): Prom
                     userId,
                     followId: follow._id,
                     type: "follow",
-                    message: `New Follower`,
-                    title: `${user.fullname} is Following  you`
+                    title: `New Follower`,
+                    message: `${user.fullname} is Following  you`
                 });
         }
         const data = await getUserProfile(user._id.toString(), user)
