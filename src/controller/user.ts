@@ -760,7 +760,7 @@ const getNotifications = async (req: Request, res: Response, next: NextFunction)
                                 {
                                     $lookup: {
                                         from: "User",
-                                        localField: "followId",
+                                        localField: "userId",
                                         foreignField: "_id",
                                         as: "followUser",
                                         pipeline: [
@@ -800,8 +800,9 @@ const getNotifications = async (req: Request, res: Response, next: NextFunction)
 
         const totalCount = results[0]?.totalNotifications[0]?.count || 0;
         const notifications = results[0]?.notifications || [];
+        const unreadNotifications = await NotificationsModel.countDocuments({ userId: user._id, isRead: false });
         const pagination = { totalCount, currentPage, perPage, totalPage: Math.ceil(totalCount / perPage) };
-        SUCCESS(res, 200, "Notifications fetched successfully", { data: notifications, pagination });
+        SUCCESS(res, 200, "Notifications fetched successfully", { data: notifications, pagination,unreadNotifications });
     } catch (error) {
         next(error);
     }
