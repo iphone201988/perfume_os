@@ -539,7 +539,7 @@ const followUser = async (req: Request, res: Response, next: NextFunction): Prom
                 });
         }
         const data = await getUserProfile(user._id.toString(), user)
-        emitNotificationCount(user._id.toString(), { count: await NotificationsModel.countDocuments({ userId: user._id, isRead: false }) });
+        emitNotificationCount(userId.toString(), { count: await NotificationsModel.countDocuments({ userId, isRead: false }) });
         emitGetProfile(user._id.toString(), data);
 
         SUCCESS(res, 200, isFollowing ? "User unfollowed successfully" : "User followed successfully");
