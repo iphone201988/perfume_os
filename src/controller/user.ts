@@ -492,30 +492,22 @@ const resetPassword = async (req: Request, res: Response, next: NextFunction): P
 };
 // delete user
 const deleteUser = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    const session = await mongoose.startSession();  
     try {
         const user = req.user;
-        session.startTransaction();
 
         const deletePromises = [
-            UserModel.findByIdAndDelete(user._id, { session }),
-            FavoritesModel.deleteMany({ userId: user._id }, { session }),
-            CollectionModel.deleteMany({ userId: user._id }, { session }),
-            WishlistModel.deleteMany({ userId: user._id }, { session }),
-            ReviewModel.deleteMany({ userId: user._id }, { session }),
-            FollowModel.deleteMany({ $or: [{ userId: user._id }, { followId: user._id }] }, { session }),
-            NotificationsModel.deleteMany({ userId: user._id }, { session }),
+            UserModel.findByIdAndDelete(user._id),
+            FavoritesModel.deleteMany({ userId: user._id }),
+            CollectionModel.deleteMany({ userId: user._id }),
+            WishlistModel.deleteMany({ userId: user._id }),
+            ReviewModel.deleteMany({ userId: user._id }),
+            FollowModel.deleteMany({ $or: [{ userId: user._id }, { followId: user._id }] }),
+            NotificationsModel.deleteMany({ userId: user._id }),
         ];
         await Promise.all(deletePromises);
 
-        await session.commitTransaction();
-        session.endSession();
-
         SUCCESS(res, 200, "User deleted successfully");
     } catch (error) {
-        // If any error occurs, abort the transaction
-        await session.abortTransaction();
-        session.endSession();
         console.error("Error in deleteUser:", error);
         next(error);
     }
@@ -728,15 +720,16 @@ const submitUserQuiz = async (req: Request, res: Response, next: NextFunction): 
 const getQuestions = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
         const userId = req.userId;
+        const {type="trivia"} = req.query;
         const userQuizRecords = await QuizModel.find({ userId }).select("questions.questionId").lean();
         const attemptedQuestionIds = userQuizRecords
             .flatMap(record => record.questions.map(q => q.questionId?.toString()))
             .filter(Boolean);
         const questions = await QuestionModel.aggregate([
-            { $match: { _id: { $nin: attemptedQuestionIds.map(id => new mongoose.Types.ObjectId(id)) }, isDeleted: false } },
+            { $match: { _id: { $nin: attemptedQuestionIds.map(id => new mongoose.Types.ObjectId(id)) }, isDeleted: false , type} },
             { $sample: { size: 10 } },
         ]);
-        if (questions?.length <= 10) throw new BadRequestError("No more questions available");
+        // if (questions?.length <= 10) throw new BadRequestError("No more questions available");
         SUCCESS(res, 200, "Question fetched successfully", { data: questions });
     } catch (error) {
         next(error);
