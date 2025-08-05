@@ -39,8 +39,8 @@ userRouter.get("/favorite", authMiddleware, validate(userValidation.getFavoriteV
 
 
 // //  user question
-// userRouter.post("/submitQuiz", authMiddleware, validate(userValidation.submitQuizValidation), userController.submitUserQuiz);
-// userRouter.get("/quiz", authMiddleware, userController.getQuestions);
+userRouter.post("/submitQuiz", authMiddleware, validate(userValidation.submitQuizValidation), userController.submitUserQuiz);
+userRouter.get("/quiz", authMiddleware, userController.getQuestions);
 
 //notification
 userRouter.get("/notifications", authMiddleware,validate(userValidation.notificationValidation), userController.getNotifications);
