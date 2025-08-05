@@ -9,6 +9,9 @@ import PerfumeModel from "../model/Perfume";
 import { startOfMonth, subMonths, endOfMonth } from 'date-fns';
 import ArticlesModel from "../model/Articles";
 import FollowModel from "../model/Follow";
+import ReviewModel from "../model/Reviews";
+import NotesModel from "../model/Notes";
+import PerfumersModel from "../model/Perfumers";
 
 
 
@@ -138,7 +141,7 @@ const getUsers = async (req: Request, res: Response, next: NextFunction): Promis
 };
 const getUserById = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
-        const user:any = await UserModel.findById(req.params.userId).select("-password");
+        const user: any = await UserModel.findById(req.params.userId).select("-password");
         if (!user) {
             throw new BadRequestError("User does not exist");
         }
@@ -149,6 +152,30 @@ const getUserById = async (req: Request, res: Response, next: NextFunction): Pro
         next(error);
     }
 }
+// update user
+const updateUser = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        await UserModel.findByIdAndUpdate(req.params.userId, req.body);
+        SUCCESS(res, 200, "User updated successfully");
+    } catch (error) {
+        next(error);
+    }
+};
+// suspend user
+const suspendAccount = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const user: any = await UserModel.findById(req.params.userId);
+        if (!user) {
+            throw new BadRequestError("User does not exist");
+        }
+        user.suspendAccount = !user.suspendAccount;
+        await user.save();
+        SUCCESS(res, 200, `User ${user.suspendAccount ? "suspended" : "activated"} successfully`);
+    } catch (error) {
+        next(error);
+    }
+};
+
 // add question
 const createQuestion = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
@@ -244,6 +271,73 @@ const deleteArticle = async (req: Request, res: Response, next: NextFunction): P
         next(error);
     }
 };
+const getPerfumes = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const { page = "1", limit = "10" } = req.query;
+        const currentPage = Math.max(Number(page), 1);
+        const perPage = Math.max(Number(limit), 1);
+        const skip = (currentPage - 1) * perPage;
+        const perfumes = await PerfumeModel.aggregate([
+            {
+                $sort: { createdAt: -1 }
+            },
+            {
+                $skip: skip
+            },
+            {
+                $limit: perPage
+            },
+            {
+                $lookup: {
+                    from: "Review",
+                    localField: "_id",
+                    foreignField: "perfumeId",
+                    as: "reviews"
+                }
+            },
+            {$addFields: { reviewCount: { $size: "$reviews" } }},
+            {
+                $project: {
+                    reviews: 0
+                }
+            }
+        ]);
 
+        const totalCount = await PerfumeModel.countDocuments({});
+        const pagination = { totalCount, currentPage, perPage , totalPage: Math.ceil(totalCount / perPage) };
+        SUCCESS(res, 200, "Perfumes fetched successfully", { data: { perfumes, pagination } });
+    } catch (error) {
+        next(error);
+    }
+};
+const getPerfumeById = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const perfume:any = await PerfumeModel.findById(req.params.perfumeId);
+        if (!perfume) {
+            throw new BadRequestError("Perfume does not exist");
+        }
+        SUCCESS(res, 200, "Perfume fetched successfully", { data: perfume });
+    } catch (error) {
+        next(error);
+    }
+};
+const getNotes = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const notes = await NotesModel.find({}).sort({ name: 1 });
+        SUCCESS(res, 200, "Notes fetched successfully", { data:  notes });
+    } catch (error) {
+        next(error);
+    }
+};
+const getPerfumers = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const perfumers = await PerfumersModel.find({}).sort({ name: 1 });
+        SUCCESS(res, 200, "Perfumers fetched successfully", { data: perfumers });
+    } catch (error) {
+        next(error);
+    }
+};
 
-export default { loginAdmin, getProfile, getUsers, getUserById, createQuestion, getQuestions, deleteQuestion, updateQuestion, dashboard, getArticles, createArticle, updateArticle, deleteArticle };
+export default { loginAdmin, getProfile, getUsers, getUserById, createQuestion, getQuestions, deleteQuestion, updateQuestion, dashboard, getArticles, createArticle, updateArticle, deleteArticle, updateUser, suspendAccount, getPerfumes ,
+    getPerfumeById, getNotes, getPerfumers
+};

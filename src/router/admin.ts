@@ -12,6 +12,8 @@ adminRouter.get("/me",authAdminMiddleware, adminController.getProfile);
 adminRouter.get("/dashboard",authAdminMiddleware, adminController.dashboard);
 adminRouter.get("/users",authAdminMiddleware, adminController.getUsers);
 adminRouter.get("/user/:userId",authAdminMiddleware, adminController.getUserById);
+adminRouter.put("/user/:userId",authAdminMiddleware, adminController.updateUser);
+adminRouter.put("/user/:userId/suspend",authAdminMiddleware, adminController.suspendAccount);
 adminRouter.post("/addQuestion", authAdminMiddleware,upload.single("file"),validate(adminValidation.createQuestionValidation), adminController.createQuestion);
 adminRouter.get("/questions", authAdminMiddleware, adminController.getQuestions);
 adminRouter.put("/question/:id", authAdminMiddleware, upload.single("file"),validate(adminValidation.updateQuestionValidation), adminController.updateQuestion);
@@ -21,4 +23,15 @@ adminRouter.get("/articles", authAdminMiddleware, adminController.getArticles);
 adminRouter.post("/addArticle",authAdminMiddleware,upload.single("file"), adminController.createArticle);
 adminRouter.put("/article/:articleId", authAdminMiddleware,upload.single("file"), adminController.updateArticle);
 adminRouter.delete("/article/:articleId", authAdminMiddleware, adminController.deleteArticle);
+
+
+//perfume
+adminRouter.get("/perfumes", authAdminMiddleware, adminController.getPerfumes);
+adminRouter.get("/perfume/:perfumeId", authAdminMiddleware, adminController.getPerfumeById);
+
+
+adminRouter.get("/notes", authAdminMiddleware, adminController.getNotes);
+adminRouter.get("/perfumers", authAdminMiddleware, adminController.getPerfumers);
+
+
 export default adminRouter

@@ -96,3 +96,13 @@ export function emitGetProfile(userId: string, data: any) {
         io.to(socketId).emit("error", "Missing socket or io instance");
     }
 };
+export function emitNotificationCount(userId: string, data: any) {
+    const socketId = getSocketId(userId);
+    if (socketId && io) {
+        console.log("📡 Emitting:", { userId, socketId, data });
+        io.to(socketId).emit("notificationCount", data);
+    } else {
+        console.log(`⚠️ Cannot emit. Missing socket or io instance for ${userId}`);
+        io.to(socketId).emit("error", "Missing socket or io instance");
+    }
+};

@@ -12,7 +12,7 @@ import ReviewModel from "../model/Reviews";
 import { IUser } from "../types/database/type";
 import BadgesModel from "../model/Badges";
 import UserBadgesModel from "../model/UserBadges";
-import { emitGetProfile } from "../services/socketManager";
+import { emitGetProfile, emitNotificationCount } from "../services/socketManager";
 import QuestionModel from "../model/QuestionModel";
 import QuizModel from "../model/QuizModel";
 import mongoose from "mongoose";
@@ -492,24 +492,35 @@ const resetPassword = async (req: Request, res: Response, next: NextFunction): P
 };
 // delete user
 const deleteUser = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    const session = await mongoose.startSession();  
     try {
         const user = req.user;
-        const password = req.query.password as any;
-        if (!password) {
-            throw new BadRequestError("Password is required");
-        }
-        const isMatch = await comparePassword(password, user.password);
-        if (!isMatch) {
-            throw new BadRequestError("Invalid password");
-        }
-        await UserModel.findByIdAndDelete(user._id);
-        await FavoritesModel.findOneAndDelete({ userId: user._id })
+        session.startTransaction();
+
+        const deletePromises = [
+            UserModel.findByIdAndDelete(user._id, { session }),
+            FavoritesModel.deleteMany({ userId: user._id }, { session }),
+            CollectionModel.deleteMany({ userId: user._id }, { session }),
+            WishlistModel.deleteMany({ userId: user._id }, { session }),
+            ReviewModel.deleteMany({ userId: user._id }, { session }),
+            FollowModel.deleteMany({ $or: [{ userId: user._id }, { followId: user._id }] }, { session }),
+            NotificationsModel.deleteMany({ userId: user._id }, { session }),
+        ];
+        await Promise.all(deletePromises);
+
+        await session.commitTransaction();
+        session.endSession();
+
         SUCCESS(res, 200, "User deleted successfully");
     } catch (error) {
-        console.log("error in deleteUser", error);
+        // If any error occurs, abort the transaction
+        await session.abortTransaction();
+        session.endSession();
+        console.error("Error in deleteUser:", error);
         next(error);
     }
 };
+
 
 const followUser = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
@@ -536,7 +547,9 @@ const followUser = async (req: Request, res: Response, next: NextFunction): Prom
                 });
         }
         const data = await getUserProfile(user._id.toString(), user)
-        emitGetProfile(user._id.toString(), data)
+        emitNotificationCount(user._id.toString(), { count: await NotificationsModel.countDocuments({ userId: user._id, isRead: false }) });
+        emitGetProfile(user._id.toString(), data);
+
         SUCCESS(res, 200, isFollowing ? "User unfollowed successfully" : "User followed successfully");
     } catch (error) {
         console.log("error in followUser", error);
@@ -813,8 +826,9 @@ const markNotificationAsRead = async (req: Request, res: Response, next: NextFun
         const { type, id} = req.query;
         if(type == "single"){
             await NotificationsModel.findByIdAndUpdate( id , {  isRead: true  });
+        }else{
+            await NotificationsModel.updateMany({ userId: user._id }, { $set: { isRead: true } });
         }
-        await NotificationsModel.updateMany({ userId: user._id }, { $set: { isRead: true } });
         SUCCESS(res, 200, "Notifications marked as read successfully", {});
     } catch (error) {
         next(error);

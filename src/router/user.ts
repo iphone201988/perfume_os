@@ -17,7 +17,7 @@ userRouter.put("/updateData", authMiddleware, validate(userValidation.updateData
 userRouter.post("/forgetPassword", validate(userValidation.forgetValidation), userController.forgetPassword);
 userRouter.post("/verifyOtp", validate(userValidation.verifyOtpValidation), userController.verifyOtp);
 userRouter.post("/resetPassword", authMiddleware, validate(userValidation.resetValidation), userController.resetPassword);
-userRouter.delete("/deleteAccount", authMiddleware, validate(userValidation.deleteValidation), userController.deleteUser);
+userRouter.delete("/deleteAccount", authMiddleware, userController.deleteUser);
 
 //uplaod image  
 userRouter.post("/upload", authMiddleware, upload.single("file"), userController.uploadImage);

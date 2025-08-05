@@ -38,6 +38,7 @@ export interface IUser extends Document {
     rankName: string | null;
     createdAt: Date;
     updatedAt: Date;
+    suspendAccount: boolean
 }
 export interface IQuiz extends Document {
     _id: ObjectId;
