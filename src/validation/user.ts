@@ -246,7 +246,7 @@ const favoriteValidation = {
       "string.base": "ID must be a string",
       "any.required": "ID is required",
     }),
-    type: Joi.string().valid("perfume", "note", "perfumer").required().messages({
+    type: Joi.string().valid("perfume", "note", "perfumer", "article").required().messages({
       "string.base": "Type must be a string",
       "any.required": "Type is required",
       "any.only": "Invalid type",
