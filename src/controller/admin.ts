@@ -12,6 +12,7 @@ import FollowModel from "../model/Follow";
 import ReviewModel from "../model/Reviews";
 import NotesModel from "../model/Notes";
 import PerfumersModel from "../model/Perfumers";
+import { getCache, setCache } from "../config/cache";
 
 
 
@@ -295,7 +296,7 @@ const getPerfumes = async (req: Request, res: Response, next: NextFunction): Pro
                     as: "reviews"
                 }
             },
-            {$addFields: { reviewCount: { $size: "$reviews" } }},
+            { $addFields: { reviewCount: { $size: "$reviews" } } },
             {
                 $project: {
                     reviews: 0
@@ -304,7 +305,7 @@ const getPerfumes = async (req: Request, res: Response, next: NextFunction): Pro
         ]);
 
         const totalCount = await PerfumeModel.countDocuments({});
-        const pagination = { totalCount, currentPage, perPage , totalPage: Math.ceil(totalCount / perPage) };
+        const pagination = { totalCount, currentPage, perPage, totalPage: Math.ceil(totalCount / perPage) };
         SUCCESS(res, 200, "Perfumes fetched successfully", { data: { perfumes, pagination } });
     } catch (error) {
         next(error);
@@ -312,7 +313,7 @@ const getPerfumes = async (req: Request, res: Response, next: NextFunction): Pro
 };
 const getPerfumeById = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
-        const perfume:any = await PerfumeModel.findById(req.params.perfumeId);
+        const perfume: any = await PerfumeModel.findById(req.params.perfumeId);
         if (!perfume) {
             throw new BadRequestError("Perfume does not exist");
         }
@@ -323,21 +324,32 @@ const getPerfumeById = async (req: Request, res: Response, next: NextFunction): 
 };
 const getNotes = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
+        const data = getCache("notes");
+        if (data) {
+            return SUCCESS(res, 200, "Notes fetched successfully", { data: data });
+        }
         const notes = await NotesModel.find({}).sort({ name: 1 });
-        SUCCESS(res, 200, "Notes fetched successfully", { data:  notes });
+        setCache("notes", notes);
+        SUCCESS(res, 200, "Notes fetched successfully", { data: notes });
     } catch (error) {
         next(error);
     }
 };
 const getPerfumers = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
+        const data = getCache("perfumers");
+        if (data) {
+            return SUCCESS(res, 200, "Perfumers fetched successfully", { data: data });
+        }
         const perfumers = await PerfumersModel.find({}).sort({ name: 1 });
+        setCache("perfumers", perfumers);
         SUCCESS(res, 200, "Perfumers fetched successfully", { data: perfumers });
     } catch (error) {
         next(error);
     }
 };
 
-export default { loginAdmin, getProfile, getUsers, getUserById, createQuestion, getQuestions, deleteQuestion, updateQuestion, dashboard, getArticles, createArticle, updateArticle, deleteArticle, updateUser, suspendAccount, getPerfumes ,
+export default {
+    loginAdmin, getProfile, getUsers, getUserById, createQuestion, getQuestions, deleteQuestion, updateQuestion, dashboard, getArticles, createArticle, updateArticle, deleteArticle, updateUser, suspendAccount, getPerfumes,
     getPerfumeById, getNotes, getPerfumers
 };

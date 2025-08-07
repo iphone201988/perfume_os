@@ -330,7 +330,19 @@ const markNotificationAsReadValidation = {
       otherwise: Joi.forbidden()
     }),
   }),
-}
+};
+const paginationValidation = {
+    query: Joi.object({
+        page: Joi.string().pattern(/^[0-9]+$/).optional().messages({
+            "string.base": "Page must be a string",
+            "string.pattern.base": "Page must be a number",
+        }),
+        limit: Joi.string().pattern(/^[0-9]+$/).optional().messages({
+            "string.base": "Limit must be a string",
+            "string.pattern.base": "Limit must be a number",
+        }),
+    }),
+};
 export default {
   socialLoginValidation,
   registerValidation,
@@ -345,5 +357,5 @@ export default {
   deleteValidation,
   userDataValidation,
   favoriteValidation, getFavoriteValidation,submitQuizValidation,
-  notificationValidation, markNotificationAsReadValidation  
+  notificationValidation, markNotificationAsReadValidation ,paginationValidation 
 };

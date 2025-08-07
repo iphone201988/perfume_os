@@ -8,6 +8,11 @@ const ReviewSchema = new mongoose.Schema({
     authorName: { type: String, default: null },
     authorImage: { type: String, default: null },
     datePublished: { type: Date, default: null },
+    title: { type: String, default: null },
+    longevity: { type: String, default: null },
+    sillage: { type: String, default: null },
+    gender: { type: String, default: null },
+    price: { type: String, default: null },
 
 }, { timestamps: true });
 

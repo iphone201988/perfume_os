@@ -12,7 +12,7 @@ import ReviewModel from "../model/Reviews";
 import { IUser } from "../types/database/type";
 import BadgesModel from "../model/Badges";
 import UserBadgesModel from "../model/UserBadges";
-import { emitGetProfile, emitNotificationCount } from "../services/socketManager";
+import { emitGetProfile, emitJoinRoom, emitNotificationCount } from "../services/socketManager";
 import QuestionModel from "../model/QuestionModel";
 import QuizModel from "../model/QuizModel";
 import mongoose from "mongoose";
@@ -20,6 +20,7 @@ import FavoritesModel from "../model/Favorites";
 import PerfumersModel from "../model/Perfumers";
 import NotesModel from "../model/Notes";
 import NotificationsModel from "../model/Notification";
+import ArticlesModel from "../model/Articles";
 //social login
 const socialLogin = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
@@ -667,66 +668,94 @@ const userData = async (req: Request, res: Response, next: NextFunction): Promis
 const submitUserQuiz = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
         const user = req.user;
-        const { type, mode, answers } = req.body;
+        const { quizId, answers } = req.body; // answers: { questionId, selectedAnswer }
 
-        const totalQuestions = answers.length;
-        let correctAnswers = 0;
-        const formattedQuestions = [];
+        const quiz = await QuizModel.findById(quizId);
+        if (!quiz) throw new BadRequestError("Quiz not found");
 
-        for (const ans of answers) {
-            const question = await QuestionModel.findById(ans.questionId);
-            if (!question) continue;
-            const isCorrect = ans.selectedAnswer?.toLowerCase() === question.correctAnswer?.toLowerCase();
-            if (isCorrect) correctAnswers++;
+        const playerIndex = quiz.players.findIndex(p => p.userId.toString() === user._id.toString());
+        if (playerIndex === -1) throw new BadRequestError("User not in this quiz");
 
-            formattedQuestions.push({
-                questionId: ans.questionId,
-                correctAnswer: question.correctAnswer,
-                selectedAnswer: ans.selectedAnswer,
-                isCorrect,
+        const player = quiz.players[playerIndex];
+
+        // Check if question already answered
+        const alreadyAnswered = player.answers?.some(
+            (ans: any) => ans.questionId.toString() === answers.questionId
+        );
+        if (alreadyAnswered) throw new BadRequestError("Question already answered");
+
+        const question = await QuestionModel.findById(answers.questionId);
+        if (!question) throw new BadRequestError("Question not found");
+
+        const isCorrect =
+            answers.selectedAnswer?.toLowerCase() === question.correctAnswer?.toLowerCase();
+
+        // Add answer to user's record
+        const answerObject = {
+            questionId: question._id,
+            correctAnswer: question.correctAnswer,
+            selectedAnswer: answers.selectedAnswer,
+            isCorrect,
+        };
+
+        player.answers.push(answerObject);
+        if (isCorrect) {
+            player.correctAnswers = (player.correctAnswers || 0) + 1;
+            player.score = (player.score || 0) + 1;
+        }
+
+        // Optional: Update points only after all questions are answered
+        const totalQuestions = quiz.totalQuestions || quiz.questions.length;
+        let pointsEarned = 0;
+        let passed = false;
+
+        if (player.answers.length === totalQuestions) {
+            passed = player.correctAnswers >= 7;
+
+            if (quiz.mode === "quick") pointsEarned = passed ? 20 : 0;
+            if (quiz.mode === "ranked") pointsEarned = passed ? 100 : -50;
+
+            const newPoints = Math.max(0, (user.rankPoints || 0) + pointsEarned);
+            const rankName = getRankName(newPoints);
+
+            player.status = passed ? "pass" : "fail";
+            player.pointsEarned = pointsEarned;
+            player.isActive = false;
+
+            await UserModel.findByIdAndUpdate(user._id, {
+                rankPoints: newPoints,
+                rankName,
             });
         }
 
-        const passed = correctAnswers >= 7;
-        let pointsEarned = 0;
+        quiz.markModified("players");
+        await quiz.save();
 
-        if (mode === "quick") pointsEarned = passed ? 20 : 0;
-        if (mode === "ranked") pointsEarned = passed ? 100 : -50;
-
-        const previousPoints = user?.rankPoints || 0;
-        const newPoints = Math.max(0, previousPoints + pointsEarned);
-        const rankName = getRankName(newPoints);
-
-        await QuizModel.create({
-            userId: user._id,
-            type,
-            mode,
-            questions: formattedQuestions,
+        SUCCESS(res, 200, "Answer submitted successfully", {
+            isCorrect,
+            answeredQuestion: answerObject,
+            currentScore: player.score,
+            totalAnswered: player.answers.length,
             totalQuestions,
-            correctAnswers,
-            score: correctAnswers * 10,
-            status: passed ? "pass" : "fail",
-            pointsEarned,
+            ...(player.answers.length === totalQuestions
+                ? { passed, pointsEarned }
+                : {}),
         });
-
-        await UserModel.findByIdAndUpdate(user._id, { rankPoints: newPoints, rankName });
-        SUCCESS(res, 200, "Quiz submitted successfully", {});
-    }
-    catch (error) {
-        console.log("error in userData", error);
+    } catch (error) {
+        console.log("Error in submitUserQuiz", error);
         next(error);
     }
 };
 const getQuestions = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
         const userId = req.userId;
-        const {type="trivia"} = req.query;
+        const { type = "trivia" } = req.query;
         const userQuizRecords = await QuizModel.find({ userId }).select("questions.questionId").lean();
         const attemptedQuestionIds = userQuizRecords
-            .flatMap(record => record.questions.map(q => q.questionId?.toString()))
+            .flatMap((record) => record.questions.map((q) => q.toString()))
             .filter(Boolean);
         const questions = await QuestionModel.aggregate([
-            { $match: { _id: { $nin: attemptedQuestionIds.map(id => new mongoose.Types.ObjectId(id)) }, isDeleted: false , type} },
+            { $match: { _id: { $nin: attemptedQuestionIds.map(id => new mongoose.Types.ObjectId(id)) }, isDeleted: false, type } },
             { $sample: { size: 10 } },
         ]);
         // if (questions?.length <= 10) throw new BadRequestError("No more questions available");
@@ -735,6 +764,236 @@ const getQuestions = async (req: Request, res: Response, next: NextFunction): Pr
         next(error);
     }
 };
+
+const createQuiz = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const userId = req.userId;
+
+        const { mode, quizType, playType } = req.body;
+
+        // Validate input
+        if (!mode || !["quick", "ranked"].includes(mode)) {
+            throw new BadRequestError("Invalid or missing mode");
+        }
+        if (!quizType || !["trivia", "scent", "guess"].includes(quizType)) {
+            throw new BadRequestError("Invalid or missing quiz type");
+        }
+        if (!playType || !["solo", "multiple"].includes(playType)) {
+            throw new BadRequestError("Invalid or missing play type");
+        }
+
+        // Get attempted question IDs from host's quiz records
+        const userQuizRecords = await QuizModel.find({
+            "players.userId": userId,
+        })
+            .select("questions")
+            .lean();
+
+        const attemptedQuestionIds = userQuizRecords
+            .flatMap((record) => record.questions.map((q) => q.toString()))
+            .filter(Boolean);
+        console.log(attemptedQuestionIds);
+        // Fetch 12 random unattempted questions of specified type
+        const questions = await QuestionModel.aggregate([
+            {
+                $match: {
+                    _id: { $nin: attemptedQuestionIds.map((id) => new mongoose.Types.ObjectId(id)) },
+                    isDeleted: false,
+                    type: quizType,
+                },
+            },
+            { $sample: { size: 12 } },
+        ]);
+
+        if (questions.length < 12) {
+            throw new BadRequestError("Not enough unattempted questions available");
+        }
+
+        // Create quiz with selected questions
+        const quiz = await QuizModel.create({
+            hostId: userId,
+            mode,
+            roomId: generateOtp(6, false, false),
+            quizType,
+            playType,
+            questions: questions.map((q) => q._id),
+            totalQuestions: 12,
+            players: [],
+            status: "waiting",
+        });
+        const getQuiz = await QuizModel.findById(quiz._id)
+            .populate({
+                path: "questions",
+                model: "Question",
+            })
+            .lean();
+
+
+        SUCCESS(res, 201, "Quiz created successfully", { data: getQuiz });
+    } catch (error) {
+        next(error);
+    }
+};
+// {
+//         userId: new mongoose.Types.ObjectId(userId),
+//         score: 0,
+//         correctAnswers: 0,
+//         pointsEarned: 0,
+//         joinedAt: new Date(),
+//         isActive: true,
+//       }
+
+const getFollowers = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const user = req.user;
+        const { page = "1", limit = "10" } = req.query;
+        const currentPage = Number(page) || 1;
+        const perPage = Number(limit) || 10;
+        const skip = (currentPage - 1) * perPage;
+
+        const results = await FollowModel.aggregate([
+            { $match: { userId: user._id } },
+            { $sort: { createdAt: -1 } },
+            {
+                $facet: {
+                    followers: [
+                        { $skip: skip },
+                        { $limit: perPage },
+                        {
+                            $lookup: {
+                                from: "User",
+                                localField: "followId",
+                                foreignField: "_id",
+                                as: "follow",
+                                pipeline: [{ $project: { fullname: 1, profileImage: 1 } }],
+                            },
+                        },
+                        { $unwind: "$follow" },
+                        { $replaceRoot: { newRoot: "$follow" } },
+                    ],
+                    total: [{ $count: "count" }],
+                },
+            },
+        ]);
+
+        const total = results[0]?.total[0]?.count || 0;
+        const followers = results[0]?.followers || [];
+        const pagination = { total, currentPage, perPage };
+
+        SUCCESS(res, 200, "Followers fetched successfully", { data: followers, pagination });
+    } catch (error) {
+        next(error);
+    }
+};
+//send quiz invite
+const sendQuizInvite = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const user = req.user;
+        const { quizId, userIds } = req.body;
+        const quiz = await QuizModel.findById(quizId);
+        if (!quiz) {
+            throw new BadRequestError("Quiz not found");
+        }
+        if (quiz.status !== "waiting") {
+            throw new BadRequestError("Quiz is not in waiting state");
+        }
+        const host = await UserModel.findById(quiz.hostId);
+        if (!host) {
+            throw new BadRequestError("Host not found");
+        }
+        const invitedUsers = await UserModel.find({ _id: { $in: userIds } }, '_id fullname deviceToken deviceType');
+        if (invitedUsers.length !== userIds.length) {
+            throw new BadRequestError("Some users are not valid");
+        }
+
+        const notifications: any[] = [];
+        const pushPromises: Promise<any>[] = [];
+        const emitPromises: Promise<void>[] = [];
+        // 3. Build notifications & push messages
+        for (const invitedUser of invitedUsers) {
+            const message = `You have been invited to a quiz by ${host.fullname}`;
+
+            // Build in-app notification
+            notifications.push({
+                userId: invitedUser._id,
+                type: "quizInvite",
+                quizId: quiz._id,
+                title: "Quiz Invite",
+                message,
+            });
+
+            // Emit unread notification count (non-blocking)
+            emitPromises.push(
+                NotificationsModel.countDocuments({ userId: invitedUser._id, isRead: false })
+                    .then((count) => emitNotificationCount(invitedUser._id.toString(), { count }))
+            );
+            // if (invitedUser.deviceToken) {
+            //     pushPromises.push(
+            //         sendPushNotification({
+            //             deviceType: invitedUser.deviceType,
+            //             token: invitedUser.deviceToken,
+            //             title: "Quiz Invite",
+            //             message: `You have been invited to a quiz by ${host.fullname}`,
+            //             data: {
+            //                 type: "quizInvite",
+            //                 quizId: quiz._id.toString(),
+            //             },
+            //         })
+            //     );
+            // }
+        }
+
+        // 4. Insert notifications in bulk
+        if (notifications.length > 0) {
+            await NotificationsModel.insertMany(notifications);
+        }
+
+        // 5. Send push notifications in parallel
+        // if (pushPromises.length > 0) {
+        //     await Promise.allSettled(pushPromises); // safer than Promise.all
+        // }
+        Promise.allSettled(emitPromises).catch(console.error);
+
+
+        SUCCESS(res, 200, "Quiz invite sent successfully");
+    } catch (error) {
+        next(error);
+
+    }
+};
+// join quiz
+const joinQuiz = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const user = req.user;
+        const { quizId, roomId } = req.body;
+        const quiz = roomId ? await QuizModel.findOne({ roomId }) : await QuizModel.findById(quizId);
+        if (!quiz) {
+            throw new BadRequestError("Quiz not found");
+        }
+        if (quiz.status !== "waiting") {
+            throw new BadRequestError("Quiz is not in waiting state");
+        }
+        if (!quiz.players.find((player) => player?.userId?.toString() === user._id.toString())) {
+            await QuizModel.updateOne({ _id: quiz._id }, { $push: { players: { userId: user._id } } });
+        }
+        const getQuiz = await QuizModel.findById(quiz._id)
+            .populate({
+                path: "questions",
+                model: "Question",
+            }).populate({
+                path: "players.userId",
+                model: "User",
+                select: "fullname profileImage",
+            })
+            .lean();
+        emitJoinRoom(user._id.toString(), getQuiz.roomId.toString(), getQuiz);
+        SUCCESS(res, 200, "Joined quiz successfully");
+    } catch (error) {
+        next(error);
+    }
+}
+
+
 const getNotifications = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
         const user = req.user;
@@ -747,68 +1006,83 @@ const getNotifications = async (req: Request, res: Response, next: NextFunction)
             userId: user._id,
         };
 
-        if (status === "unread") filter["isRead"] = false ;
+        if (status === "unread") filter["isRead"] = false;
 
         const results = await NotificationsModel.aggregate([
             { $match: filter },
             { $sort: { createdAt: -1 } },
-            {$facet:{
-                notifications: [
-                    { $skip: skip },
-                    { $limit: perPage },
-                    {
-                        $lookup: {
-                            from: "Follow",
-                            localField: "followId",
-                            foreignField: "_id",
-                            as: "follow",
-                            pipeline: [
-                                {
-                                    $lookup: {
-                                        from: "User",
-                                        localField: "userId",
-                                        foreignField: "_id",
-                                        as: "followUser",
-                                        pipeline: [
-                                            {
-                                                $project: {
-                                                    _id: 1,
-                                                    fullname: 1,
-                                                    profileImage: 1,
+            {
+                $facet: {
+                    notifications: [
+                        { $skip: skip },
+                        { $limit: perPage },
+                        {
+                            $lookup: {
+                                from: "Follow",
+                                localField: "followId",
+                                foreignField: "_id",
+                                as: "follow",
+                                pipeline: [
+                                    {
+                                        $lookup: {
+                                            from: "User",
+                                            localField: "userId",
+                                            foreignField: "_id",
+                                            as: "followUser",
+                                            pipeline: [
+                                                {
+                                                    $project: {
+                                                        _id: 1,
+                                                        fullname: 1,
+                                                        profileImage: 1,
+                                                    },
                                                 },
-                                            },
-                                        ],
-        
+                                            ],
+
+                                        },
                                     },
-                                },
-                                {
-                                    $unwind: {
-                                        path: "$followUser",
-                                        preserveNullAndEmptyArrays: true
+                                    {
+                                        $unwind: {
+                                            path: "$followUser",
+                                            preserveNullAndEmptyArrays: true
+                                        },
                                     },
-                                },
-                            ],
-                        }
-                    },
-                    {
-                        $unwind: {
-                            path: "$follow",
-                            preserveNullAndEmptyArrays: true
+                                ],
+                            }
                         },
-                    }
-                
-            ],
-                totalNotifications: [
-                    { $count: "count" },
-                ],
-            }}
+                        {
+                            $unwind: {
+                                path: "$follow",
+                                preserveNullAndEmptyArrays: true
+                            },
+                        }, {
+                            $lookup: {
+                                from: "Quiz",
+                                localField: "quizId",
+                                foreignField: "_id",
+                                as: "quiz",
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: "$quiz",
+                                preserveNullAndEmptyArrays: true
+                            },
+                        },
+
+                    ],
+                    totalNotifications: [
+                        { $count: "count" },
+                    ],
+                }
+            }
         ]);
 
         const totalCount = results[0]?.totalNotifications[0]?.count || 0;
         const notifications = results[0]?.notifications || [];
         const unreadNotifications = await NotificationsModel.countDocuments({ userId: user._id, isRead: false });
         const pagination = { totalCount, currentPage, perPage, totalPage: Math.ceil(totalCount / perPage) };
-        SUCCESS(res, 200, "Notifications fetched successfully", { data: notifications, pagination,unreadNotifications });
+        SUCCESS(res, 200, "Notifications fetched successfully", { data: notifications, pagination, unreadNotifications });
     } catch (error) {
         next(error);
     }
@@ -816,13 +1090,39 @@ const getNotifications = async (req: Request, res: Response, next: NextFunction)
 const markNotificationAsRead = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
         const user = req.user;
-        const { type, id} = req.query;
-        if(type == "single"){
-            await NotificationsModel.findByIdAndUpdate( id , {  isRead: true  });
-        }else{
+        const { type, id } = req.query;
+        if (type == "single") {
+            await NotificationsModel.findByIdAndUpdate(id, { isRead: true });
+        } else {
             await NotificationsModel.updateMany({ userId: user._id }, { $set: { isRead: true } });
         }
         SUCCESS(res, 200, "Notifications marked as read successfully", {});
+    } catch (error) {
+        next(error);
+    }
+};
+const getArticles = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const { page="1", limit="10" } = req.query;
+        const currentPage = Math.max(Number(page), 1);
+        const perPage = Math.max(Number(limit), 1);
+        const skip = (currentPage - 1) * perPage;
+        const articles = await ArticlesModel.find({}).sort({ createdAt: -1 }).skip(skip).limit(perPage).lean();
+        const totalCount = await ArticlesModel.countDocuments({});
+        const pagination = { totalCount, currentPage, perPage };
+        SUCCESS(res, 200, "Articles fetched successfully", { data: articles, pagination });
+    } catch (error) {
+        next(error);
+    }
+};
+ const getArticlesById = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const { id } = req.params;
+        const articles = await ArticlesModel.findById(id).lean();
+        if(!articles){
+            throw new Error("Article not found");
+        }
+        SUCCESS(res, 200, "Articles fetched successfully", { data: articles });
     } catch (error) {
         next(error);
     }
@@ -832,5 +1132,5 @@ export default {
     register, login, profile, updateUserData, uploadImage,
     forgetPassword, verifyOtp, resetPassword, profileUpdate, socialLogin, deleteUser,
     followUser, addCollection, addWishlist, userData, submitUserQuiz, getQuestions,
-    getNotifications, markNotificationAsRead
+    getNotifications, markNotificationAsRead, createQuiz, getFollowers, sendQuizInvite, joinQuiz, getArticles, getArticlesById
 };

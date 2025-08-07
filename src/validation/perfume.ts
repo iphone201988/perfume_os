@@ -14,6 +14,29 @@ const writeReviewValidation = {
             "string.base": "Review must be a string",
             "any.required": "Review is required",
         }),
+        title: Joi.string().required().messages({
+            "string.base": "Title must be a string",
+            "any.required": "Title is required",
+        }),
+        longevity: Joi.string().optional().allow("").messages({
+            "string.base": "Longevity must be a string",
+        }),
+        sillage: Joi.string().optional().allow("").messages({
+            "string.base": "Sillage must be a string",
+        }),
+        gender: Joi.string().optional().allow("").messages({
+            "string.base": "Gender must be a string",
+        }),
+        topNotes: Joi.string().optional().allow("").messages({
+            "string.base": "Top notes must be a string",
+        }),
+        middleNotes: Joi.string().optional().allow("").messages({
+            "string.base": "Middle notes must be a string",
+        }),
+        price: Joi.string().optional().allow("").messages({
+            "string.base": "Price must be a string",
+        }),
+
     }),
 };
 const getPerfumeReviewsValidation = {
@@ -96,5 +119,17 @@ const searchValidation = {
         }),
     }),
 };
+const paginationValidation = {
+    query: Joi.object({
+        page: Joi.string().pattern(/^[0-9]+$/).optional().messages({
+            "string.base": "Page must be a string",
+            "string.pattern.base": "Page must be a number",
+        }),
+        limit: Joi.string().pattern(/^[0-9]+$/).optional().messages({
+            "string.base": "Limit must be a string",
+            "string.pattern.base": "Limit must be a number",
+        }),
+    }),
+};
 
-export default { writeReviewValidation, getPerfumeReviewsValidation, idValidation, similarValidation, getPerfumeValidation, searchValidation,  };
+export default { writeReviewValidation, getPerfumeReviewsValidation, idValidation, similarValidation, getPerfumeValidation, searchValidation, paginationValidation };

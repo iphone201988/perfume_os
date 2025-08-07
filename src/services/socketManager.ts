@@ -106,3 +106,17 @@ export function emitNotificationCount(userId: string, data: any) {
         io.to(socketId).emit("error", "Missing socket or io instance");
     }
 };
+export function emitJoinRoom(userId: string, roomId: string, data: any) {
+    const socketId = getSocketId(userId);
+    if (socketId && io) {
+        const socket = io.sockets.sockets.get(socketId);
+        if (socket) {
+            socket.join(roomId);
+            console.log("📡 User joined room:", { userId, socketId, roomId });
+            io.to(roomId).emit("joinRoom", {roomId, data});
+        }
+    } else {
+        console.log(`⚠️ Cannot emit. Missing socket or io instance for ${userId}`);
+        io.to(socketId).emit("error", "Missing socket or io instance");
+    }
+};

@@ -189,14 +189,78 @@ const recentAndTopSearches = async (req: Request, res: Response, next: NextFunct
 const writeReview = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         const user = req.user;
-        const perfume = await PerfumeModel.findById(req.body.perfumeId);
+        const { perfumeId, longevity, sillage } = req.body;
+
+        const perfume = await PerfumeModel.findById(perfumeId);
         if (!perfume) {
             throw new BadRequestError("Perfume not found");
         }
-        const review = await ReviewModel.create({ ...req.body, userId: req.user._id, datePublished: new Date(), authorImage: req.user.profileImage, authorName: req.user.fullname });
-        const data = await getUserProfile(user._id.toString(), user)
-        emitGetProfile(user._id.toString(), data)
+
+        // 1. Create review
+        const review = await ReviewModel.create({
+            ...req.body,
+            userId: user._id,
+            datePublished: new Date(),
+            authorImage: user.profileImage,
+            authorName: user.fullname,
+        });
+
+        // 2. Increment rating.votes
+        const newVotes = (perfume.rating?.votes || 0) + 1;
+
+        // 3. Longevity update
+        const longevityField = longevity?.toLowerCase();
+        const sillageField = sillage?.toLowerCase();
+
+        const updatedLongevity = { ...perfume.longevity };
+        const updatedSillage = { ...perfume.sillage };
+
+        if (longevityField) {
+            const currentVote = perfume.longevity?.[longevityField]?.vote || 0;
+            updatedLongevity[longevityField] = {
+                vote: currentVote + 1,
+                percentage: 0, // will calculate below
+            };
+        }
+        console.log(updatedLongevity);
+
+        if (sillageField) {
+            const currentVote = perfume.sillage?.[sillageField]?.vote || 0;
+            updatedSillage[sillageField] = {
+                vote: currentVote + 1,
+                percentage: 0,
+            };
+        }
+
+        // 4. Recalculate percentages
+        const longevityTotalVotes = Object.values(updatedLongevity).reduce((sum: number, l: any) => sum + (l.vote || 0), 0);
+        const sillageTotalVotes = Object.values(updatedSillage).reduce((sum: number, s: any) => sum + (s.vote || 0), 0);
+
+        for (const key in updatedLongevity) {
+            const vote = updatedLongevity[key].vote || 0;
+            updatedLongevity[key].percentage = longevityTotalVotes > 0 ? Number(((vote / longevityTotalVotes) * 100).toFixed(1)) : 0;
+        }
+
+        for (const key in updatedSillage) {
+            const vote = updatedSillage[key].vote || 0;
+            updatedSillage[key].percentage = sillageTotalVotes > 0 ? Number(((vote / sillageTotalVotes) * 100).toFixed(1)) : 0;
+        }
+
+        // 5. Update Perfume document
+        await PerfumeModel.findByIdAndUpdate(perfumeId, {
+            $set: {
+                'longevity': updatedLongevity,
+                'sillage': updatedSillage,
+                'rating.votes': newVotes
+            }
+        });
+
+        // 6. Emit user profile update
+        const data = await getUserProfile(user._id.toString(), user);
+        emitGetProfile(user._id.toString(), data);
+
         SUCCESS(res, 200, "Review added successfully", { data: review });
+
     } catch (error) {
         next(error);
     }
@@ -286,7 +350,7 @@ const simillerPerfume = async (req: Request, res: Response, next: NextFunction):
                 .skip(skip)
                 .limit(10)
                 .lean();
-            const totalCount = await PerfumeModel.countDocuments({"perfumers.perfumerId": perfumer._id});
+            const totalCount = await PerfumeModel.countDocuments({ "perfumers.perfumerId": perfumer._id });
             const pagination = {
                 totalCount,
                 currentPage,
@@ -323,7 +387,7 @@ const simillerPerfume = async (req: Request, res: Response, next: NextFunction):
                 currentPage,
                 perPage
             };
-            SUCCESS(res, 200, "Similler Perfumes fetched successfully", { data: perfumes,pagination });
+            SUCCESS(res, 200, "Similler Perfumes fetched successfully", { data: perfumes, pagination });
         } else {
             throw new BadRequestError("Type not found");
         }
@@ -508,7 +572,110 @@ const getFavorites = async (req: Request, res: Response, next: NextFunction): Pr
     } catch (error) {
         next(error);
     }
-}
+};
+
+const getPerfumeRecommendations = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        const user = req.user;
+
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+        const skip = (page - 1) * limit;
+
+        // Step 1: Get user's interacted perfumes (favorites, wishlist, etc.)
+        const [favorites, collection, wishlist, searches] = await Promise.all([
+            FavoritesModel.find({ userId: user._id, type: "perfume" }, "perfumeId"),
+            CollectionModel.find({ userId: user._id }, "perfumeId"),
+            WishlistModel.find({ userId: user._id }, "perfumeId"),
+            SearchModel.find({ userId: user._id }, "perfumeId"),
+        ]);
+
+        const userPerfumeIds = new Set([
+            ...favorites,
+            ...collection,
+            ...wishlist,
+            ...searches,
+        ].map((doc) => doc.perfumeId.toString()));
+
+        // Step 2: Extract user preferences from favorite/search perfumes
+        const interactedPerfumes = await PerfumeModel.find({ _id: { $in: Array.from(userPerfumeIds) } });
+
+        const intendedFor = [...new Set(interactedPerfumes.flatMap(p => p.intendedFor || []))];
+        const mainAccords = [...new Set(interactedPerfumes.flatMap(p => (p.mainAccords || []).map(a => a.name)))];
+        const noteNames = [...new Set(interactedPerfumes.flatMap(p =>
+            [
+                ...(p.notes?.top || []),
+                ...(p.notes?.middle || []),
+                ...(p.notes?.base || []),
+            ].map(n => n.name)
+        ))];
+
+        // Step 3: Aggregate matching perfumes with scoring and pagination
+        const baseMatch:any = {
+            _id: { $nin: Array.from(userPerfumeIds).map(id => new mongoose.Types.ObjectId(id)) }
+        };
+
+        // Add the most selective filter first
+        if (intendedFor.length > 0) {
+            baseMatch.intendedFor = { $in: intendedFor };
+        }
+
+        const results = await PerfumeModel.aggregate([
+            { $match: baseMatch },
+            {
+                $addFields: {
+                    matchScore: {
+                        $add: [
+                            { $size: { $setIntersection: ["$intendedFor", intendedFor] } },
+                            { $size: { $setIntersection: ["$mainAccords.name", mainAccords] } },
+                            { $size: { $setIntersection: ["$notes.top.name", noteNames] } },
+                            { $size: { $setIntersection: ["$notes.middle.name", noteNames] } },
+                            { $size: { $setIntersection: ["$notes.base.name", noteNames] } },
+                        ]
+                    }
+                }
+            },
+            { $match: { matchScore: { $gt: 30 } } },
+            { $sort: { matchScore: -1, createdAt: -1 } },
+            {
+                $project: {
+                    _id: 1,
+                    name: 1,
+                    brand: 1,
+                    image: 1,
+                    matchScore: 1
+                }
+            },
+            {
+                $facet: {
+                    data: [{ $skip: skip }, { $limit: limit }],
+                    total: [{ $count: "count" }]
+                }
+            }
+        ]).allowDiskUse(true).exec();
+        const perfumes = results[0].data;
+        const total = results[0].total[0]?.count || 0;
+
+        const pagination = {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+        };
+
+        return SUCCESS(res, 200, "Recommended perfumes fetched successfully", {
+            data: perfumes,
+            pagination
+        });
+
+    } catch (error) {
+        console.error("Error in perfume recommendations:", error);
+        next(error);
+    }
+};
+
+
+
 
 // async function lalala() {
 //     const notesList = await NotesModel.find({}).lean();
@@ -731,15 +898,15 @@ async function changeInReview() {
 
 // add noteid which not have 
 async function addNotesToPerfume(name: string, noteId: string) {
-    if(!name || !noteId) return;
-   const perfumes = await PerfumeModel.find({
-    $or: [
-        { "notes.top":    { $elemMatch: { name: name, noteId: { $exists: false } } } },
-        { "notes.middle": { $elemMatch: { name: name, noteId: { $exists: false } } } },
-        { "notes.base":   { $elemMatch: { name: name, noteId: { $exists: false } } } },
-        { "notes.notes":  { $elemMatch: { name: name, noteId: { $exists: false } } } }
-    ]
-}).lean();
+    if (!name || !noteId) return;
+    const perfumes = await PerfumeModel.find({
+        $or: [
+            { "notes.top": { $elemMatch: { name: name, noteId: { $exists: false } } } },
+            { "notes.middle": { $elemMatch: { name: name, noteId: { $exists: false } } } },
+            { "notes.base": { $elemMatch: { name: name, noteId: { $exists: false } } } },
+            { "notes.notes": { $elemMatch: { name: name, noteId: { $exists: false } } } }
+        ]
+    }).lean();
     const noteSections = ['top', 'middle', 'base', 'notes'];
     let count = 0;
 
@@ -763,4 +930,4 @@ async function addNotesToPerfume(name: string, noteId: string) {
 }
 // addNotesToPerfume("Green Leaves","6839edacc412f47360596aa2")
 
-export default { perfume, recentAndTopSearches, searchPerfume, writeReview, getPerfumeReviews, getNotes, getPerfumer, simillerPerfume, addFavorite, getFavorites };
+export default { perfume, recentAndTopSearches, searchPerfume, writeReview, getPerfumeReviews, getNotes, getPerfumer, simillerPerfume, addFavorite, getFavorites, getPerfumeRecommendations };

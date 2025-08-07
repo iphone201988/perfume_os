@@ -5,6 +5,7 @@ import authMiddleware from "../middleware/auth";
 import { validate } from "../middleware/validate";
 import { upload } from "../middleware/upload";
 import perfumeController  from "../controller/perfume";
+import rankController  from "../controller/ranks";
 
 const userRouter = express.Router();
 
@@ -42,7 +43,29 @@ userRouter.get("/favorite", authMiddleware, validate(userValidation.getFavoriteV
 userRouter.post("/submitQuiz", authMiddleware, validate(userValidation.submitQuizValidation), userController.submitUserQuiz);
 userRouter.get("/quiz", authMiddleware, userController.getQuestions);
 
+userRouter.post("/createQuiz", authMiddleware, userController.createQuiz);
+
+userRouter.post("/sendQuizInvite", authMiddleware, userController.sendQuizInvite);
+
+userRouter.post("/joinQuiz", authMiddleware, userController.joinQuiz);
+
+
+//followers
+userRouter.get("/followers", authMiddleware, userController.getFollowers);
+
 //notification
 userRouter.get("/notifications", authMiddleware,validate(userValidation.notificationValidation), userController.getNotifications);
 userRouter.put("/markNotificationAsRead", authMiddleware,validate(userValidation.markNotificationAsReadValidation), userController.markNotificationAsRead);
+
+
+
+//ranks
+userRouter.get("/ranks", authMiddleware, rankController.getRanks);
+userRouter.post("/rank", authMiddleware, upload.single("file"), rankController.createRank);
+
+
+//articles
+userRouter.get("/articles", authMiddleware, validate(userValidation.paginationValidation), userController.getArticles);
+userRouter.get("/article/:id", authMiddleware, userController.getArticlesById);
+
 export default userRouter

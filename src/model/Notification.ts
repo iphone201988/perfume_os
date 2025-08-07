@@ -3,6 +3,7 @@ const NotificationsSchema = new mongoose.Schema({
     userId: { type: Schema.Types.ObjectId, ref: "User" },
     type: { type: String, default: null },
     followId: { type: Schema.Types.ObjectId, ref: "Follow" },
+    quizId: { type: Schema.Types.ObjectId, ref: "Quiz" },
     title: { type: String, default: null },
     message: { type: String, default: null },
     isRead: { type: Boolean, default: false },
