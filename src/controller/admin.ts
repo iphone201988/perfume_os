@@ -287,11 +287,27 @@ const deleteArticle = async (req: Request, res: Response, next: NextFunction): P
 };
 const getPerfumes = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
-        const { page = "1", limit = "10" } = req.query;
+        const { page = "1", limit = "10",search, sort='date_desc' } = req.query;
         const currentPage = Math.max(Number(page), 1);
         const perPage = Math.max(Number(limit), 1);
         const skip = (currentPage - 1) * perPage;
+        const findQuery: any = {  };
+          if (search) {
+            findQuery.name = new RegExp("^" + search, "i")
+        };
+        const sortOptions: Record<string, Record<string, 1 | -1>> = {
+            "date_desc": { createdAt: -1 },
+            "date_asc": { createdAt: 1 },
+            "name_asc": { questionText: 1 },
+            "name_desc": { questionText: -1 },
+        };
+
+        const sortStage = sortOptions[sort as string] || { questionText: 1 };
+
         const perfumes = await PerfumeModel.aggregate([
+            {
+                $match: findQuery
+            },
             {
                 $sort: { createdAt: -1 }
             },
