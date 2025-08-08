@@ -636,7 +636,7 @@ const getPerfumeRecommendations = async (req: Request, res: Response, next: Next
                 }
             },
             { $match: { matchScore: { $gt: 25 } } },
-            { $sort: { matchScore: -1, createdAt: -1 } },
+            { $sort: { matchScore: -1, } },
             {
                 $project: {
                     _id: 1,
