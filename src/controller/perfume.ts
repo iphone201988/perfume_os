@@ -653,11 +653,40 @@ const getPerfumeRecommendations = async (req: Request, res: Response, next: Next
                 }
             }
         ]).allowDiskUse(true).exec();
-        const perfumes = results[0].data;
+        let perfumes = results[0].data;
         const total = results[0].total[0]?.count || 0;
-
+        if (!perfumes.length) {
+            perfumes = await SearchModel.aggregate([
+                {
+                    $group: {
+                        _id: "$perfumeId",
+                        count: { $sum: 1 }
+                    }
+                },
+                { $sort: { count: -1 } },
+                { $limit: 10 },
+                {
+                    $lookup: {
+                        from: "Perfume", // Collection name (case sensitive)
+                        localField: "_id",
+                        foreignField: "_id",
+                        as: "perfume"
+                    }
+                },
+                { $unwind: "$perfume" },
+                {
+                    $project: {
+                        _id: "$perfume._id",
+                        name: "$perfume.name",
+                        brand: "$perfume.brand",
+                        image: "$perfume.image",
+                        count: 1
+                    }
+                }
+            ]);
+        };
         const pagination = {
-            totalCount: total,
+            totalCount: total == 0 ? perfumes.length : total,
             currentPage: page,
             perPage: limit,
         };
