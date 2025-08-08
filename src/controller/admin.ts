@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import QuestionModel from "../model/QuestionModel";
 import { SUCCESS } from "../utils/response";
-import { comparePassword, findUserByEmail, generateOtp, publicViewData, signToken } from "../utils/utills";
+import { comparePassword, filterMainAccords, findUserByEmail, generateOtp, parseJsonIfString, processNotes, processPercentageArray, processPerfumers, publicViewData, signToken } from "../utils/utills";
 import { BadRequestError } from "../utils/errors";
 import AdminModel from "../model/Admin";
 import UserModel from "../model/User";
@@ -230,11 +230,24 @@ const updateQuestion = async (req: Request, res: Response, next: NextFunction): 
 
 const getArticles = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
-        const { page = "1", limit = "10" } = req.query;
+        const { page = "1", limit = "10", search, sort = 'date_desc' } = req.query;
         const currentPage = Math.max(Number(page), 1);
         const perPage = Math.max(Number(limit), 1);
         const skip = (currentPage - 1) * perPage;
-        const articles = await ArticlesModel.find({}).sort({ createdAt: -1 }).skip(skip).limit(perPage).lean();
+        const findQuery: any = {  };
+        if (search) {
+            findQuery.questionText = new RegExp("^" + search, "i")
+        };
+        const sortOptions: Record<string, Record<string, 1 | -1>> = {
+            "date_desc": { createdAt: -1 },
+            "date_asc": { createdAt: 1 },
+            "name_asc": { questionText: 1 },
+            "name_desc": { questionText: -1 },
+        };
+
+        const sortStage = sortOptions[sort as string] || { questionText: 1 };
+
+        const articles = await ArticlesModel.find(findQuery).sort(sortStage).skip(skip).limit(perPage).lean();
         const totalCount = await ArticlesModel.countDocuments({});
         const pagination = { totalCount, currentPage, perPage };
         SUCCESS(res, 200, "Articles fetched successfully", { data: { articles, pagination } });
@@ -349,7 +362,136 @@ const getPerfumers = async (req: Request, res: Response, next: NextFunction): Pr
     }
 };
 
+const createPerfume = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+        if (req?.file) {
+            req.body.image = `/uploads/${(req.file as Express.Multer.File).filename}`;
+        }
+
+        let {
+            intendedFor,
+            mainAccords,
+            perfumers,
+            notes,
+            occasions,
+            seasons,
+            ...data
+        } = req.body;
+
+        // Parse JSON strings if they come from multipart form data
+        data.intendedFor = parseJsonIfString(intendedFor);
+        mainAccords = parseJsonIfString(mainAccords);
+        perfumers = parseJsonIfString(perfumers);
+        notes = parseJsonIfString(notes);
+        occasions = parseJsonIfString(occasions);
+        seasons = parseJsonIfString(seasons);
+
+        // Validation
+        if (!data.name || !data.brand) {
+            return res.status(400).json({
+                success: false,
+                message: "Name and brand are required fields"
+            });
+        }
+
+        // Get all perfumers and notes data
+        const allPerfumers: any = getCache("perfumers") ? getCache("perfumers") : await PerfumersModel.find({}).sort({ name: 1 });
+        const allNotes: any = getCache("notes") ? getCache("notes") : await NotesModel.find({}).sort({ name: 1 });
+
+        data.mainAccords = filterMainAccords(mainAccords);
+        data.perfumers = processPerfumers(perfumers, allPerfumers);
+        data.notes = processNotes(notes, allNotes);
+        data.occasions = processPercentageArray(occasions);
+        data.seasons = processPercentageArray(seasons);
+        data.longevity = {
+            eternal: { vote: 0, percentage: 0 },
+            "long lasting": { vote: 0, percentage: 0 },
+            moderate: { vote: 0, percentage: 0 },
+            "very weak": { vote: 0, percentage: 0 },
+            weak: { vote: 0, percentage: 0 },
+        };
+        data.sillage = {
+            intimate: { vote: 0, percentage: 0 },
+            moderate: { vote: 0, percentage: 0 },
+            strong: { vote: 0, percentage: 0 },
+            enormous: { vote: 0, percentage: 0 },
+        };
+        data.rating = {
+            score: 0,
+            votes: 0,
+        };
+        data.createdAt = new Date();
+        data.updatedAt = new Date();
+
+
+        console.log("data", data);
+
+        // Create the perfume
+        const newPerfume = await PerfumeModel.create(data);
+
+        SUCCESS(res, 201, "Perfume created successfully", newPerfume);
+    } catch (error) {
+        console.error('Create perfume error:', error);
+        next(error);
+    }
+};
+const deletePerfume = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const perfumeId = req.params.perfumeId;
+        const perfume = await PerfumeModel.findByIdAndDelete(perfumeId);
+        if (!perfume) {
+            throw new BadRequestError("Perfume not found");
+        }
+        SUCCESS(res, 200, "Perfume deleted successfully");
+    } catch (error) {
+        console.error('Delete perfume error:', error);
+        next(error);
+    }
+};
+const updatePerfume = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const perfumeId = req.params.perfumeId;
+        if (req?.file) {
+            req.body.image = `/uploads/${(req.file as Express.Multer.File).filename}`;
+        }
+
+        let {
+            intendedFor,
+            mainAccords,
+            perfumers,
+            notes,
+            occasions,
+            seasons,
+            ...data
+        } = req.body;
+
+        data.intendedFor = parseJsonIfString(intendedFor);
+        mainAccords = parseJsonIfString(mainAccords);
+        perfumers = parseJsonIfString(perfumers);
+        notes = parseJsonIfString(notes);
+        occasions = parseJsonIfString(occasions);
+        seasons = parseJsonIfString(seasons);
+
+        const allPerfumers: any = getCache("perfumers") ? getCache("perfumers") : await PerfumersModel.find({}).sort({ name: 1 });
+        const allNotes: any = getCache("notes") ? getCache("notes") : await NotesModel.find({}).sort({ name: 1 });
+        data.mainAccords = filterMainAccords(mainAccords);
+        data.perfumers = processPerfumers(perfumers, allPerfumers);
+        data.notes = processNotes(notes, allNotes);
+        data.occasions = processPercentageArray(occasions);
+        data.seasons = processPercentageArray(seasons);
+
+        const perfume = await PerfumeModel.findByIdAndUpdate(perfumeId, data, { new: true });
+        if (!perfume) {
+            throw new BadRequestError("Perfume not found");
+        }
+        SUCCESS(res, 200, "Perfume updated successfully",);
+    } catch (error) {
+        console.error('Update perfume error:', error);
+        next(error);
+    }
+};
+
 export default {
     loginAdmin, getProfile, getUsers, getUserById, createQuestion, getQuestions, deleteQuestion, updateQuestion, dashboard, getArticles, createArticle, updateArticle, deleteArticle, updateUser, suspendAccount, getPerfumes,
-    getPerfumeById, getNotes, getPerfumers
+    getPerfumeById, getNotes, getPerfumers, createPerfume, deletePerfume, updatePerfume
 };

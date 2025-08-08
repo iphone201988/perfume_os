@@ -65,3 +65,59 @@ export function getRankName(points: number): string {
   if (points >= 100) return "Perfume Acolyte";
   return "Apprentice Nose";
 }
+
+
+export const parseJsonIfString = (field: any) => {
+    if (typeof field === 'string') {
+        try {
+            return JSON.parse(field);
+        } catch {
+            return null;
+        }
+    }
+    return field;
+};
+
+export const filterMainAccords = (mainAccords: any[] = []) =>
+    mainAccords.filter(accord =>
+        accord.name?.trim() &&
+        accord.width !== '0%'
+    );
+
+export const processPerfumers = (perfumers = [], allPerfumers = []) =>
+    perfumers.map(p => {
+        const found = allPerfumers.find((perf: any) =>
+            perf._id.toString() === p.perfumerId || perf._id.toString() === p.value
+        );
+        return {
+            name: found?.name || '',
+            image: found?.smallImage || '',
+            perfumerId: p.perfumerId || p.value,
+        };
+    });
+
+export const processNotes = (notes = {}, allNotes = []) => {
+    const sections = ['top', 'middle', 'base', 'note'];
+    const result = {};
+
+    sections.forEach(section => {
+        result[section] = (notes[section] || []).map(note => {
+            const found = allNotes.find((n: any) =>
+                n._id.toString() === note.noteId || n._id.toString() === note.value
+            );
+            return {
+                image: found?.image || '',
+                name: found?.name || '',
+                noteId: note.noteId || note.value
+            };
+        });
+    });
+
+    return result;
+};
+
+export const processPercentageArray = (arr = []) =>
+    arr.map(item => ({
+        name: item.name,
+        width: item.width ? `${item.width}%` : '0%'
+    }));

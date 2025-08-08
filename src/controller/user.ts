@@ -21,6 +21,7 @@ import PerfumersModel from "../model/Perfumers";
 import NotesModel from "../model/Notes";
 import NotificationsModel from "../model/Notification";
 import ArticlesModel from "../model/Articles";
+import RanksModel from "../model/Ranks";
 //social login
 const socialLogin = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
@@ -175,7 +176,8 @@ const profile = async (req: Request, res: Response, next: NextFunction): Promise
                                     review: 1,
                                     userId: 1,
                                     perfumeId: 1,
-                                    createdAt: 1
+                                    createdAt: 1,
+                                    title: 1
                                 }
                             }
                         ],
@@ -288,7 +290,8 @@ export const getUserProfile = async (userId: string, currentUser: IUser | null):
                                     review: 1,
                                     userId: 1,
                                     perfumeId: 1,
-                                    createdAt: 1
+                                    createdAt: 1,
+                                    title: 1
                                 }
                             }
                         ],
@@ -716,7 +719,8 @@ const submitUserQuiz = async (req: Request, res: Response, next: NextFunction): 
             if (quiz.mode === "ranked") pointsEarned = passed ? 100 : -50;
 
             const newPoints = Math.max(0, (user.rankPoints || 0) + pointsEarned);
-            const rankName = getRankName(newPoints);
+            const rank = await RanksModel.findOne({ min: { $lte: newPoints }, max: { $gte: newPoints } });
+            const rankName = rank ? rank.name : null;
 
             player.status = passed ? "pass" : "fail";
             player.pointsEarned = pointsEarned;

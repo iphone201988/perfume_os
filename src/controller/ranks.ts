@@ -6,8 +6,16 @@ import RanksModel from "../model/Ranks";
 // create rank
 const createRank = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
-        if (req?.file) {
-            req.body.image = `/uploads/${(req.file as Express.Multer.File).filename}`
+        const files = req.files as {
+            [fieldname: string]: Express.Multer.File[];
+        };
+
+        if (files?.image?.length > 0) {
+            req.body.image = `/uploads/${files.image[0].filename}`;
+        }
+
+        if (files?.otherImage?.length > 0) {
+            req.body.otherImage = `/uploads/${files.otherImage[0].filename}`;
         }
         await RanksModel.create(req.body);
         SUCCESS(res, 200, "Rank created successfully");

@@ -4,6 +4,7 @@ const RanksSchema = new mongoose.Schema({
     name: { type: String, default: null },
     description: { type: String, default: null },
     image: { type: String, default: null },
+    otherImage: { type: String, default: null },
     min: { type: Number, default: 0 },
     max: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },

@@ -61,7 +61,7 @@ userRouter.put("/markNotificationAsRead", authMiddleware,validate(userValidation
 
 //ranks
 userRouter.get("/ranks", authMiddleware, rankController.getRanks);
-userRouter.post("/rank", authMiddleware, upload.single("file"), rankController.createRank);
+userRouter.post("/rank", authMiddleware, upload.fields([{ name: 'image', maxCount: 1 }, { name: 'otherImage', maxCount: 1 }]), rankController.createRank);
 
 
 //articles
