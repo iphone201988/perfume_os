@@ -298,11 +298,11 @@ const getPerfumes = async (req: Request, res: Response, next: NextFunction): Pro
         const sortOptions: Record<string, Record<string, 1 | -1>> = {
             "date_desc": { createdAt: -1 },
             "date_asc": { createdAt: 1 },
-            "name_asc": { questionText: 1 },
-            "name_desc": { questionText: -1 },
+            "name_asc": { name: 1 },
+            "name_desc": { name: -1 },
         };
 
-        const sortStage = sortOptions[sort as string] || { questionText: 1 };
+        const sortStage = sortOptions[sort as string] || { name: 1 };
 
         const perfumes = await PerfumeModel.aggregate([
             {
