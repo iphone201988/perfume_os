@@ -611,7 +611,7 @@ const getPerfumeRecommendations = async (req: Request, res: Response, next: Next
         ))];
 
         // Step 3: Aggregate matching perfumes with scoring and pagination
-        const baseMatch:any = {
+        const baseMatch: any = {
             _id: { $nin: Array.from(userPerfumeIds).map(id => new mongoose.Types.ObjectId(id)) }
         };
 
@@ -657,10 +657,9 @@ const getPerfumeRecommendations = async (req: Request, res: Response, next: Next
         const total = results[0].total[0]?.count || 0;
 
         const pagination = {
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit),
+            totalCount: total,
+            currentPage: page,
+            perPage: limit,
         };
 
         return SUCCESS(res, 200, "Recommended perfumes fetched successfully", {
@@ -674,7 +673,28 @@ const getPerfumeRecommendations = async (req: Request, res: Response, next: Next
     }
 };
 
+// const noteimage = async () => {
+//     try {
+//         const notes = await NotesModel.find({}).lean();
+//         console.log(notes.length, "notes found");
+//         for (const note of notes) {
+//             let imageUrl = note.bgUrl;
+//             // Fallback to thumbnails if available
+//             const image = note?.thumbnails?.[0]?.src ?? imageUrl;
 
+//             // Update document
+//             await NotesModel.updateOne(
+//                 { _id: note._id },
+//                 { $set: { image } }
+//             );
+//         }
+
+//         console.log("Note images updated successfully.");
+//     } catch (err) {
+//         console.error("Error updating note images:", err);
+//     }
+// };
+// noteimage();
 
 
 // async function lalala() {
