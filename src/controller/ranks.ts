@@ -20,11 +20,16 @@ const getRanks = async (req: Request, res: Response, next: NextFunction): Promis
         const user = req.user;
         const rankPoints = user.rankPoints || 0;
         const ranks = await RanksModel.find({}).sort({ min: 1 }).lean();
+
+        const ranksWithFlag = ranks.map((rank: any) => ({
+            ...rank,
+            currentRank: rankPoints >= rank.min && rankPoints <= rank.max
+        }));
         const currentRank = ranks.find(rank => rankPoints >= rank.min && rankPoints <= rank.max) || null;
 
         SUCCESS(res, 200, "Ranks fetched successfully", {
             data: {
-                ranks,
+                ranks: ranksWithFlag,
                 currentRank,
                 rankPoints,
             }
